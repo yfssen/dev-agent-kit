@@ -1,0 +1,11 @@
+---
+description: 代码生成铁律：无 BOM、注释无表情
+alwaysApply: true
+---
+
+# 代码生成铁律
+
+1. **编码 UTF-8**：源码/文本配置一律 UTF-8（勿用 GBK/GB2312/UTF-16）。
+2. **无 BOM**：UTF-8 without BOM（禁 `EF BB BF` / `U+FEFF`）。
+3. **注释无表情**：注释、文档字符串禁止 emoji/表情符号；用 OK/FAIL/TODO 等文字。
+4. `*.ps1` / `*.sh`：纯 ASCII、无 BOM；中文只写在 `.md`（`.md` 亦为 UTF-8 无 BOM）。

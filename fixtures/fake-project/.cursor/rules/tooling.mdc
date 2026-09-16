@@ -1,0 +1,66 @@
+---
+description: 项目智能体工具层：查状态、自检、验证、对账的固定入口
+alwaysApply: true
+---
+
+# 工具层（AI 自主干活的固定入口）
+
+本项目已具备可用工具，遇到相应任务**直接用**，不要说"无法访问"。
+脚本：Windows `*.ps1` / Unix `*.sh`（逻辑相同）。完整说明见套件 `adapters/_common/TOOLING.md`。
+
+## 0. 扫描 / MySQL
+
+```powershell
+./scripts/scan-project.ps1
+./scripts/mysql.ps1
+# Unix: ./scripts/scan-project.sh | ./scripts/mysql.sh
+```
+
+双 git：`.env` 常在后端目录，改 `# ADAPT`。
+
+## 1. 查真实状态（只读）
+
+```powershell
+./scripts/db.ps1 "<只读 SQL>"        # ADAPT
+# Unix: ./scripts/db.sh "<只读 SQL>"
+```
+
+- 脚本自动读 `.env`，密码经环境变量传入，**不出现在命令行**
+- **安全红线**：白名单——只允许只读语句；写操作/文件 I/O 被拦截
+- 客户端：`$env:LZ_MYSQL` / `$LZ_MYSQL` > PATH；找不到报 `exit 2`
+
+## 2. 自检（改完代码必跑）
+
+```powershell
+./scripts/lint.ps1 <文件或目录>       # ADAPT
+# Unix: ./scripts/lint.sh <文件或目录>
+```
+
+- **缺依赖时报 `exit 2`，绝不误报成语法错**；真错才 `exit 1`
+- 规则：**任何代码编辑后，收尾前必须自检通过**
+
+## 3. 验证（接口/功能冒烟）
+
+```powershell
+./scripts/smoke.ps1
+./scripts/smoke.ps1 -BaseUrl "<远程>"
+# Unix: ./scripts/smoke.sh [--base-url <远程>]
+```
+
+- 用测试夹具自动取 token；`PASS` / `WARN` / `FAIL` 含义见 AGENTS.md
+- **本地环境要服务当前代码**，改完即可本地验证
+
+## 4. 对账（谈进度/改错位前必跑）
+
+```powershell
+./scripts/api-check.ps1
+# Unix: ./scripts/api-check.sh
+```
+
+- 前端调用 ↔ 后端方法；**更新 SSOT 前先跑它**
+
+## 5. 标准工作闭环
+
+```
+对账(api-check) → 查状态(db) → 按规范写码 → 自检(lint) → 验证(smoke) → 更新 SSOT
+```

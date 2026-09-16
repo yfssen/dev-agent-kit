@@ -1,0 +1,18 @@
+# Local / OS
+.env
+.env.*
+!.env.example
+*.kit-new
+docs/_scan-raw.md
+.workbuddy-ai/
+
+# Editor / OS junk
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Stale target (dry-run copies templates into TEMP)
+fixtures/fake-project/scripts/
