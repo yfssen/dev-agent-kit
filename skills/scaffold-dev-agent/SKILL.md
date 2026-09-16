@@ -4,7 +4,8 @@ description: >-
   Scaffolds a project into a development agent using the dev-agent-kit
   (memory + scripts + SSOT + adapters), then runs 二开 init/learn: structure,
   architecture, CRUD, dual-git, and MUST ask the user for MySQL connection
-  command/DSN, write .env, and fill DB review docs. Use when installing
+  command/DSN (or accept「无库」to skip DB for frontend-only projects), write
+  .env when applicable, and fill DB review docs. Use when installing
   开发智能体, 项目初始化, or applying dev-agent-kit for Cursor/Claude/Codex/Kiro/WorkBuddy/Qoder.
 ---
 
@@ -86,10 +87,10 @@ Read both sides; keep project facts; add kit tooling; delete `*.kit-new`.
 **Follow [init-workflow.md](init-workflow.md).** Summary:
 
 1. `./scripts/scan-project.ps1 -OutFile docs/_scan-raw.md`
-2. **向用户索要 MySQL 连接命令或 DSN**（必做）→ `apply-mysql-dsn` 写 `.env` → 填 `docs/数据库连接与复盘.md`（无密码）→ `db.ps1 "SELECT 1 AS ok"`
-3. Deep-read FE+BE → `docs/项目结构与架构.md` + `AGENTS.md` + SSOT
-4. Point scripts `# ADAPT`（含 `.env` 路径，双 git 常为 backend）
-5. 账号可全权限；写库须用户同意并用 `mysql.*`，且记入复盘日志
+2. **向用户索要 MySQL 连接命令或 DSN**（必问）→ 有库则 `apply-mysql-dsn` 写 `.env` → 填复盘文档 → `SELECT 1`；**用户回「无库」则复盘标跳过，不写假 .env，不阻塞后续学习**
+3. Deep-read FE（+BE if any）→ `docs/项目结构与架构.md` + `AGENTS.md` + SSOT（无后端时写明待建）
+4. Point scripts `# ADAPT`（含 `.env` 路径，双 git 常为 backend；无库可暂不改 db 路径）
+5. 有库时：账号可全权限；写库须用户同意并用 `mysql.*`，且记入复盘日志
 
 ### 5–6) Adapt + verify
 
