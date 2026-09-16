@@ -18,7 +18,7 @@
 | `claude/` | 根目录 `CLAUDE.md` | Claude Code 自动读 |
 | `codex/` | （通常无需额外文件） | Codex 原生读 `AGENTS.md` |
 | `kiro/` | `.kiro/steering/*.md` | Kiro steering |
-| `workbuddy/` | `CODEBUDDY.md` + `.codebuddy/rules/` | WorkBuddy/CodeBuddy（别名 `codebuddy`） |
+| `workbuddy/` | `CODEBUDDY.md` + `.codebuddy/rules/` + 项目级 `.codebuddy/skills/scaffold-dev-agent/` | WorkBuddy/CodeBuddy（别名 `codebuddy`） |
 | `qoder/` | `.qoder/rules/*.md` | Qoder（另原生读 `AGENTS.md`） |
 | `_common/` | 不直接拷贝 | 共享母本（含 `CODING.md`：无 BOM、注释无表情） |
 

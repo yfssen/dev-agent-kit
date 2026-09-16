@@ -95,6 +95,8 @@ if ($OutFile) {
     }
     $dir = Split-Path $OutFile -Parent
     if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
-    Set-Content -Path $OutFile -Value $text -Encoding utf8
+    # Write UTF-8 WITHOUT BOM: PowerShell 5.1 "-Encoding utf8" emits a BOM,
+    # which violates the project rule "UTF-8 without BOM".
+    [System.IO.File]::WriteAllText($OutFile, $text, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ("Wrote " + $OutFile)
 }

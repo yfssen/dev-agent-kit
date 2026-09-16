@@ -103,7 +103,18 @@ foreach ($a in $wanted) {
             Get-ChildItem (Join-Path $KitRoot "adapters\workbuddy\rules") -File | ForEach-Object {
                 Install-File $_.FullName (Join-Path (Join-Path $ProjectRoot ".codebuddy\rules") $_.Name)
             }
-            Write-Host "[OK] adapter workbuddy/codebuddy"
+            # WorkBuddy often indexes project skills more reliably than user-global alone
+            $projSkill = Join-Path $ProjectRoot ".codebuddy\skills\scaffold-dev-agent"
+            Ensure-Dir (Join-Path $projSkill "scripts")
+            $skillSrc = Join-Path $KitRoot "skills\scaffold-dev-agent"
+            Install-File (Join-Path $skillSrc "SKILL.md") (Join-Path $projSkill "SKILL.md")
+            Install-File (Join-Path $skillSrc "adapter-map.md") (Join-Path $projSkill "adapter-map.md")
+            Install-File (Join-Path $skillSrc "init-workflow.md") (Join-Path $projSkill "init-workflow.md")
+            Get-ChildItem (Join-Path $skillSrc "scripts") -File | ForEach-Object {
+                Install-File $_.FullName (Join-Path (Join-Path $projSkill "scripts") $_.Name)
+            }
+            Set-Content -Path (Join-Path $projSkill "kit-path.txt") -Value $KitRoot -Encoding ascii
+            Write-Host "[OK] adapter workbuddy/codebuddy (+ project .codebuddy/skills/scaffold-dev-agent)"
         }
         "qoder" {
             Ensure-Dir (Join-Path $ProjectRoot ".qoder\rules")

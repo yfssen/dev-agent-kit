@@ -123,7 +123,19 @@ for a in "${wanted[@]}"; do
         [ -f "$f" ] || continue
         install_file "$f" "$PROJ/.codebuddy/rules/$(basename "$f")"
       done
-      echo "[OK] adapter workbuddy/codebuddy"
+      # WorkBuddy often indexes project skills more reliably than user-global alone
+      PROJ_SKILL="$PROJ/.codebuddy/skills/scaffold-dev-agent"
+      mkdir -p "$PROJ_SKILL/scripts"
+      SKILL_SRC="$KIT/skills/scaffold-dev-agent"
+      install_file "$SKILL_SRC/SKILL.md" "$PROJ_SKILL/SKILL.md"
+      install_file "$SKILL_SRC/adapter-map.md" "$PROJ_SKILL/adapter-map.md"
+      install_file "$SKILL_SRC/init-workflow.md" "$PROJ_SKILL/init-workflow.md"
+      for f in "$SKILL_SRC/scripts/"*; do
+        [ -f "$f" ] || continue
+        install_file "$f" "$PROJ_SKILL/scripts/$(basename "$f")"
+      done
+      printf '%s\n' "$KIT" > "$PROJ_SKILL/kit-path.txt"
+      echo "[OK] adapter workbuddy/codebuddy (+ project .codebuddy/skills/scaffold-dev-agent)"
       ;;
     qoder)
       mkdir -p "$PROJ/.qoder/rules"

@@ -7,6 +7,8 @@ description: >-
   command/DSN (or accept「无库」to skip DB for frontend-only projects), write
   .env when applicable, and fill DB review docs. Use when installing
   开发智能体, 项目初始化, or applying dev-agent-kit for Cursor/Claude/Codex/Kiro/WorkBuddy/Qoder.
+description_zh: "安装开发智能体：拷贝记忆/脚本/SSOT/adapters，按 init-workflow 做项目初始化分析；有库要 MySQL，无库可回「无库」跳过。用于 scaffold-dev-agent、开发智能体、项目初始化。"
+description_en: "Install a development agent (memory + scripts + SSOT + adapters) and run init-workflow. Ask for MySQL or accept 无库 for frontend-only."
 ---
 
 # Scaffold Development Agent
