@@ -8,15 +8,17 @@ alwaysApply: true
 本项目已具备可用工具，遇到相应任务**直接用**，不要说"无法访问"。
 脚本：Windows `*.ps1` / Unix `*.sh`（逻辑相同）。完整说明见套件 `adapters/_common/TOOLING.md`。
 
-## 0. 扫描 / MySQL
+## 0. 扫描 / 连接写入 / MySQL
 
 ```powershell
 ./scripts/scan-project.ps1
+./scripts/apply-mysql-dsn.ps1 -Command 'mysql -h.. -u.. -p.. -D..'
 ./scripts/mysql.ps1
-# Unix: ./scripts/scan-project.sh | ./scripts/mysql.sh
+# Unix: ./scripts/scan-project.sh | ./scripts/apply-mysql-dsn.sh --command '...' | ./scripts/mysql.sh
 ```
 
 双 git：`.env` 常在后端目录，改 `# ADAPT`。
+`apply-mysql-dsn`：初始化时把连接命令/DSN 解析写入 `.env`（密码只留 `.env`）；无库跳过。
 
 ## 1. 查真实状态（只读）
 
@@ -59,9 +61,15 @@ alwaysApply: true
 ```
 
 - 前端调用 ↔ 后端方法；**更新 SSOT 前先跑它**
+- 默认只打 Summary + 前 20 条错位（省 token）；全量加 `-All` / `ALL=1`
 
 ## 5. 标准工作闭环
 
 ```
-对账(api-check) → 查状态(db) → 按规范写码 → 自检(lint) → 验证(smoke) → 更新 SSOT
+定位现行逻辑（SSOT 落点 / rg / scan 的 Git hot files）
+  → 只读命中文件（不要整仓、不要整份 _scan-raw）
+  → 对账(api-check 默认摘要) → 查状态(db)
+  → 按规范写码 → 自检(lint 命中文件) → 验证(smoke) → 更新 SSOT 触及的行
 ```
+
+**证明没猜错** = lint 绿 + smoke 通 + api-check Summary 与改动一致，而不是模型「觉得对」。

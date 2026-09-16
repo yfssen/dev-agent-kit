@@ -4,6 +4,7 @@
 # ADAPT: APP_DIR/API_DIR/ADDON_DIR paths, the frontend url regex, and route shapes.
 # Status: OK / NO_METHOD / NO_CONTROLLER / UNKNOWN
 # Usage: ./scripts/api-check.sh  |  APP_DIR=... ./scripts/api-check.sh
+# Default: Summary + first LIMIT mismatch rows. ALL=1 prints every row including OK.
 # Encoding: ASCII-only (no BOM). Put Chinese notes in .md files.
 
 set -eu
@@ -12,6 +13,7 @@ APP_DIR="${APP_DIR:-frontend/src}"                       # ADAPT
 API_DIR="${API_DIR:-backend/app/api/controller}"         # ADAPT
 ADDON_DIR="${ADDON_DIR:-backend/addon}"                  # ADAPT
 SHOW_ALL="${ALL:-0}"
+LIMIT="${LIMIT:-20}"
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
@@ -148,17 +150,26 @@ if [ "$SHOW_ALL" = "1" ] && [ "$ok" -gt 0 ]; then
 fi
 if [ "$nm" -gt 0 ]; then
   echo "-- NO_METHOD --"
-  awk -F'\t' '$1=="NO_METHOD"{print "[NM]   " $2 "   -> " $4 "   (" $3 ")"}' "$TMP/rows"
+  awk -F'\t' '$1=="NO_METHOD"{print "[NM]   " $2 "   -> " $4 "   (" $3 ")"}' "$TMP/rows" | awk -v lim="$LIMIT" -v all="$SHOW_ALL" -v total="$nm" '
+    all=="1" || NR<=lim { print }
+    END { if (all!="1" && total>lim) print "... +" (total-lim) " more; re-run with ALL=1" }
+  '
   echo ""
 fi
 if [ "$nc" -gt 0 ]; then
   echo "-- NO_CONTROLLER --"
-  awk -F'\t' '$1=="NO_CONTROLLER"{print "[NC]   " $2 "   -> " $4 "   (" $3 ")"}' "$TMP/rows"
+  awk -F'\t' '$1=="NO_CONTROLLER"{print "[NC]   " $2 "   -> " $4 "   (" $3 ")"}' "$TMP/rows" | awk -v lim="$LIMIT" -v all="$SHOW_ALL" -v total="$nc" '
+    all=="1" || NR<=lim { print }
+    END { if (all!="1" && total>lim) print "... +" (total-lim) " more; re-run with ALL=1" }
+  '
   echo ""
 fi
 if [ "$uk" -gt 0 ]; then
   echo "-- UNKNOWN --"
-  awk -F'\t' '$1=="UNKNOWN"{print "[??]   " $2 "   (" $3 ")"}' "$TMP/rows"
+  awk -F'\t' '$1=="UNKNOWN"{print "[??]   " $2 "   (" $3 ")"}' "$TMP/rows" | awk -v lim="$LIMIT" -v all="$SHOW_ALL" -v total="$uk" '
+    all=="1" || NR<=lim { print }
+    END { if (all!="1" && total>lim) print "... +" (total-lim) " more; re-run with ALL=1" }
+  '
   echo ""
 fi
 

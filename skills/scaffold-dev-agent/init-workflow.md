@@ -124,6 +124,8 @@ Learn progress:
 - [ ] api-check once if feasible (else N/A)
 ```
 
+Daily after init: locate via SSOT / `rg` / scan Git hot files; read only the hits; prove with `lint` + `smoke` + `api-check` summary (`-All` / `ALL=1` for full). Do not paste whole `docs/_scan-raw.md`.
+
 ## Step D — Tool-layer self-check（装完必查，别信「已安装」）
 
 安装脚本只保证文件到位，不保证脚本**能跑对**。逐项实测，别只看 exit code：
@@ -150,3 +152,4 @@ Learn progress:
 - [ ] `docs/项目结构与架构.md` + `AGENTS.md` + SSOT seeded
 - [ ] If has DB: `db`/`mysql` `.env` path correct; if 无库: docs state 待建
 - [ ] New chat can work without re-asking architecture (may still need DB if `.env` missing and project now has a backend)
+- [ ] **Step D 实测通过**（工具层真的能跑，不只是「文件已拷贝」）——BOM / 相对路径 / curl 状态码 / 空环境变量 Join-Path 逐项验过；**未过 Step D 不算装完**

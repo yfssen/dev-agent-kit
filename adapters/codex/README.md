@@ -13,5 +13,7 @@ Codex 原生读取项目根目录 **`AGENTS.md`**，因此：
 ## 闭环（与其它 adapter 相同）
 
 ```
-api-check → db → 写码 → lint → smoke → 更新 SSOT
+定位（SSOT / rg / scan hot files）→ 只读命中文件 → api-check 摘要 → db → 写码 → lint → smoke → 更新 SSOT 触及的行
 ```
+
+不要把 `docs/_scan-raw.md` 整份贴进对话。`api-check` 默认摘要，全量加 `-All` / `ALL=1`。

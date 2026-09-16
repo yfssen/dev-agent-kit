@@ -83,9 +83,36 @@ foreach ($d in $dirs) {
     if ($tags.Count -gt 0) { L ("- " + $d.Name + " -> " + ($tags -join ",")) }
 }
 L ""
+
+# Recent churn (helps locate logic without dumping the tree)
+L "## Git hot files (last 20 commits, top 12)"
+$gitCmd = Get-Command git -ErrorAction SilentlyContinue
+if (-not $gitCmd) {
+    L "- skipped: git not on PATH"
+} else {
+    Push-Location $Root
+    try {
+        git rev-parse --is-inside-work-tree 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            L "- skipped: not a git work tree"
+        } else {
+            $names = @(git -c core.quotepath=false log -20 --name-only --pretty=format: 2>$null | Where-Object { $_ })
+            $counts = @{}
+            foreach ($n in $names) {
+                if (-not $counts.ContainsKey($n)) { $counts[$n] = 0 }
+                $counts[$n]++
+            }
+            $top = @($counts.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 12)
+            if ($top.Count -eq 0) { L "- none (empty log)" }
+            else { foreach ($e in $top) { L ("- " + $e.Value + " " + $e.Key) } }
+        }
+    } finally { Pop-Location }
+}
+L ""
 L "## Next"
 L "- Agent: fill docs/project-architecture.md (CN filename in templates/docs) from code + this scan"
 L "- ADAPT scripts .env path if dual-git (often <backend>/.env)"
+L "- Do not paste this whole dump into chat; grep the section you need"
 
 $text = ($lines -join "`n") + "`n"
 Write-Host $text

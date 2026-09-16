@@ -4,15 +4,17 @@
 
 脚本：Windows 用 `*.ps1`，Linux/macOS 用 `*.sh`（逻辑相同）。
 
-## 0. 初始化扫描 / MySQL 连接
+## 0. 初始化扫描 / 连接写入 / MySQL
 
 ```
 ./scripts/scan-project.ps1 [-OutFile docs/_scan-raw.md]
+./scripts/apply-mysql-dsn.ps1 -Command 'mysql -h.. -u.. -p.. -D..'   # 解析连接命令/DSN -> 写入 .env
 ./scripts/mysql.ps1          # interactive; password from .env via MYSQL_PWD
 ./scripts/db.ps1 "<只读 SQL>"
 ```
 
 双 git 时 `.env` 常在后端目录——改脚本里 `# ADAPT` 的 `.env` 路径。
+`apply-mysql-dsn` 只在**初始化**时用（用户给出连接命令/DSN → 写入 `.env`，密码只留 `.env`）；无库则跳过。
 
 ## 1. 查真实状态（只读）
 
@@ -59,9 +61,15 @@
 
 - 抽前端调用 ↔ 比对后端方法是否存在；输出带 `文件:行号`
 - **这是错位表的对账源**：更新 SSOT 前先跑它拿真实清单
+- 默认只打 **Summary + 前 20 条错位**（省 token）；全量用 `./scripts/api-check.ps1 -All` 或 `ALL=1 ./scripts/api-check.sh`
 
 ## 5. 标准工作闭环
 
 ```
-对账(api-check) → 查状态(db) → 按规范写码 → 自检(lint) → 验证(smoke) → 更新 SSOT
+定位现行逻辑（SSOT 落点 / rg / scan 的 Git hot files）
+  → 只读命中文件（不要整仓、不要整份 _scan-raw）
+  → 对账(api-check 默认摘要) → 查状态(db)
+  → 按规范写码 → 自检(lint 命中文件) → 验证(smoke) → 更新 SSOT 触及的行
 ```
+
+**证明没猜错** = lint 绿 + smoke 通 + api-check Summary 与改动一致，而不是模型「觉得对」。

@@ -111,8 +111,10 @@ Read both sides; keep project facts; add kit tooling; delete `*.kit-new`.
 ## Closed loop
 
 ```
-api-check → db → code → lint → smoke → update SSOT
+locate (SSOT + rg + scan hot files) → read hits only → api-check (summary) → db → code → lint → smoke → update SSOT rows touched
 ```
+
+Do not dump `_scan-raw.md` or whole trees into the reply. Default `api-check` already truncates mismatch lists (`-All` / `ALL=1` for full).
 
 ## Non-goals
 

@@ -6,7 +6,7 @@
 ## 合同（任何 adapter 必须满足）
 
 1. **指向核心**：明确要求读 `AGENTS.md`、跑 `scripts/`、维护 SSOT。
-2. **薄**：不复制业务知识；项目坑只写在 `AGENTS.md` / SSOT。
+2. **薄**：不复制业务知识；项目事实只写在 `AGENTS.md` / SSOT（且须可被代码验证）。
 3. **可叠加**：同一项目可同时装 Cursor + Claude + WorkBuddy + Qoder 等。
 4. **不绑栈**：不出现具体业务路径。
 

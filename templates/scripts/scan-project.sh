@@ -55,9 +55,19 @@ tmp=$(mktemp)
       | head -n 8 | while read -r f; do echo "- ${f#$ROOT/}"; done
   done
   echo ""
+  echo "## Git hot files (last 20 commits, top 12)"
+  if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT" -c core.quotepath=false log -20 --name-only --pretty=format: 2>/dev/null | sed '/^$/d' | sort | uniq -c | sort -nr | head -n 12 | while read -r c f; do
+      echo "- $c $f"
+    done
+  else
+    echo "- skipped: git missing or not a git work tree"
+  fi
+  echo ""
   echo "## Next"
   echo "- Agent: fill docs/project-architecture.md (CN filename in templates/docs) from code + this scan"
   echo "- ADAPT scripts .env path if dual-git (often <backend>/.env)"
+  echo "- Do not paste this whole dump into chat; grep the section you need"
 } >"$tmp"
 
 cat "$tmp"

@@ -52,7 +52,9 @@ try {
   $must = @(
     "scripts\db.ps1", "scripts\lint.ps1", "scripts\smoke.ps1", "scripts\api-check.ps1",
     "scripts\db.sh", "scripts\lint.sh", "scripts\smoke.sh", "scripts\api-check.sh",
-    "scripts\mysql.ps1", "scripts\mysql.sh", "scripts\scan-project.ps1",
+    "scripts\mysql.ps1", "scripts\mysql.sh",
+    "scripts\scan-project.ps1", "scripts\scan-project.sh",
+    "scripts\apply-mysql-dsn.ps1", "scripts\apply-mysql-dsn.sh",
     ".cursor\rules\tooling.mdc", ".cursor\rules\coding.mdc",
     "CLAUDE.md", ".kiro\steering\tooling.md", "AGENTS.md"
   )
@@ -61,9 +63,14 @@ try {
     else { Bad "missing $rel" }
   }
 
-  # Mother templates must not ship machine-private paths
-  $dbRaw = Get-Content (Join-Path $work "scripts\db.ps1") -Raw
-  if ($dbRaw -match 'phpstudy_pro') { Bad "db.ps1 still contains machine-private path" } else { Ok "db.ps1 has no phpstudy path" }
+  # Mother templates must not ship machine-private paths -- check ALL scripts, not just db.ps1
+  $privHit = 0
+  foreach ($sf in (Get-ChildItem (Join-Path $work "scripts") -File)) {
+    if ($sf.Name -notmatch '\.(ps1|sh)$') { continue }
+    $raw = Get-Content $sf.FullName -Raw
+    if ($raw -match 'phpstudy_pro') { Bad "machine-private path in $($sf.Name)"; $privHit++ }
+  }
+  if ($privHit -eq 0) { Ok "no machine-private path in scripts/ (all .ps1/.sh)" }
 
   Push-Location $work
   $ErrorActionPreference = "Continue"

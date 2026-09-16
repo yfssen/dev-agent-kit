@@ -4,12 +4,14 @@
 #
 # Status: OK / NO_METHOD (controller exists, action missing) / NO_CONTROLLER / UNKNOWN
 # Usage: ./scripts/api-check.ps1  |  -AppDir <frontend>  |  -All
+# Default: Summary + first $Limit mismatch rows (saves tokens). -All prints every row including OK.
 
 param(
     [string]$AppDir = "frontend/src",                       # ADAPT
     [string]$ApiDir = "backend/app/api/controller",         # ADAPT
     [string]$AddonDir = "backend/addon",                    # ADAPT (optional plugin dir)
-    [switch]$All
+    [switch]$All,
+    [int]$Limit = 20
 )
 
 $root = Split-Path $PSScriptRoot -Parent
@@ -76,14 +78,26 @@ $nm = @($rows | Where-Object { $_.status -eq 'NO_METHOD' })
 $nc = @($rows | Where-Object { $_.status -eq 'NO_CONTROLLER' })
 $uk = @($rows | Where-Object { $_.status -eq 'UNKNOWN' })
 
+function Write-Slice([string]$title, [string]$color, [string]$tag, $list, [scriptblock]$fmt) {
+    if ($list.Count -eq 0) { return }
+    Write-Host $title -ForegroundColor $color
+    $slice = if ($All) { $list } else { @($list | Select-Object -First $Limit) }
+    foreach ($r in $slice) { Write-Host (& $fmt $r) -ForegroundColor $color }
+    if (-not $All -and $list.Count -gt $Limit) {
+        Write-Host ("... +" + ($list.Count - $Limit) + " more; re-run with -All") -ForegroundColor DarkGray
+    }
+    Write-Host ""
+}
+
 Write-Host "== API check: $AppDir ==`n"
-if ($All -and $ok.Count -gt 0) { Write-Host "-- OK --" -ForegroundColor Green; foreach ($r in $ok) { Write-Host ("[OK]   " + $r.url + "   (" + $r.where + ")") -ForegroundColor Green }; Write-Host "" }
-if ($nm.Count -gt 0) { Write-Host "-- NO_METHOD --" -ForegroundColor Yellow; foreach ($r in $nm) { Write-Host ("[NM]   " + $r.url + "   -> " + $r.hint + "   (" + $r.where + ")") -ForegroundColor Yellow }; Write-Host "" }
-if ($nc.Count -gt 0) { Write-Host "-- NO_CONTROLLER --" -ForegroundColor Red; foreach ($r in $nc) { Write-Host ("[NC]   " + $r.url + "   -> " + $r.hint + "   (" + $r.where + ")") -ForegroundColor Red }; Write-Host "" }
-if ($uk.Count -gt 0) { Write-Host "-- UNKNOWN --" -ForegroundColor DarkGray; foreach ($r in $uk) { Write-Host ("[??]   " + $r.url + "   (" + $r.where + ")") -ForegroundColor DarkGray }; Write-Host "" }
+if ($All -and $ok.Count -gt 0) {
+    Write-Slice "-- OK --" "Green" "OK" $ok { param($r) "[OK]   $($r.url)   ($($r.where))" }
+}
+Write-Slice "-- NO_METHOD --" "Yellow" "NM" $nm { param($r) "[NM]   $($r.url)   -> $($r.hint)   ($($r.where))" }
+Write-Slice "-- NO_CONTROLLER --" "Red" "NC" $nc { param($r) "[NC]   $($r.url)   -> $($r.hint)   ($($r.where))" }
+Write-Slice "-- UNKNOWN --" "DarkGray" "UK" $uk { param($r) "[??]   $($r.url)   ($($r.where))" }
 
 $summary = "== Summary: OK=" + $ok.Count + " NO_METHOD=" + $nm.Count + " NO_CONTROLLER=" + $nc.Count + " UNKNOWN=" + $uk.Count + " =="
-Write-Host $summary
 Write-Output $summary
 if (($nm.Count + $nc.Count) -gt 0) { exit 1 }
 exit 0

@@ -19,6 +19,7 @@
 | 用途 | Windows | Unix |
 |------|---------|------|
 | 结构扫描 | `./scripts/scan-project.ps1` | `./scripts/scan-project.sh` |
+| 写入 .env | `./scripts/apply-mysql-dsn.ps1 -Command '...'` | `./scripts/apply-mysql-dsn.sh --command '...'` |
 | MySQL 交互 | `./scripts/mysql.ps1` | `./scripts/mysql.sh` |
 | 查状态 | `./scripts/db.ps1 "<只读SQL>"` | `./scripts/db.sh "<只读SQL>"` |
 | 自检 | `./scripts/lint.ps1 <路径>` | `./scripts/lint.sh <路径>` |
@@ -30,5 +31,7 @@
 ## 闭环
 
 ```
-api-check → db → 写码 → lint → smoke → 更新 SSOT
+定位（SSOT / rg / scan hot files）→ 只读命中文件 → api-check 摘要 → db → 写码 → lint → smoke → 更新 SSOT 触及的行
 ```
+
+不要把 `docs/_scan-raw.md` 整份贴进对话。`api-check` 默认摘要，全量加 `-All` / `ALL=1`。
