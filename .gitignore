@@ -16,3 +16,10 @@ Thumbs.db
 
 # Stale target (dry-run copies templates into TEMP)
 fixtures/fake-project/scripts/
+
+# Internal engineering notes (not for open-source consumers)
+完整度评估报告.md
+修复核验报告.md
+核验报告-第三轮.md
+*核验报告*.md
+*评估报告*.md
