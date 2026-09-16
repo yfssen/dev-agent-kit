@@ -14,8 +14,14 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Stale target (dry-run copies templates into TEMP)
+# Stale target (dry-run copies templates + adapters into TEMP)
 fixtures/fake-project/scripts/
+fixtures/fake-project/CLAUDE.md
+fixtures/fake-project/CODEBUDDY.md
+fixtures/fake-project/.cursor/rules/
+fixtures/fake-project/.kiro/
+fixtures/fake-project/.codebuddy/
+fixtures/fake-project/.qoder/
 
 # Local-only notes (keep private drafts here; never publish contents)
 internal/

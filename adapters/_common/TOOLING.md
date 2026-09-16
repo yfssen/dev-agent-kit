@@ -37,6 +37,7 @@
 - **缺依赖时报 `exit 2`（依赖缺失），绝不误报成语法错**；真错才 `exit 1`
 - 规则：**任何代码编辑后，收尾前必须自检通过**
 - **ADAPT 陷阱**：若先 `cd` 到子目录再跑 eslint/tsc，相对路径必须先按**工作区根**解析再剥前缀（`.ps1`/`.sh` 一致）。`Join-Path` 的 base（如 `$env:ProgramFiles`）可能为空——先判空，否则终止性错误会带走整个候选块。
+- **ADAPT 陷阱（`.ps1`）**：调用 checker 前设 `$global:LASTEXITCODE = $null`（不要赋 0，也不要写无作用域的 `$LASTEXITCODE = $null`，那会造出脚本局部变量把真退出码挡住）。PowerShell 退出码是进程级的，上一条留下的 `1` 在 checker 没启动时会被当成语法错。
 
 ## 3. 验证（接口/功能冒烟）
 

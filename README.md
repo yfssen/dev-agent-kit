@@ -130,7 +130,8 @@ chmod +x install-global.sh && ./install-global.sh
 ./fixtures/dry-run.ps1
 ```
 
-> 前置：`php` 在 PATH（或设 `LZ_PHP`）——lint / smoke 项需要它；缺 php 时这两项会报 `FAIL`，属环境前置而非脚本缺陷。
+> 前置：`php` 在 PATH（或设 `LZ_PHP`）——lint / smoke 项需要它；缺 php 时这两项会报 `FAIL`，属环境前置而非脚本缺陷。  
+> 有 Git Bash 时会跑 `.sh`（含 `install.sh` merge-safe）；CI 用 `-RequireBash`，缺 bash 即失败。GitHub Actions 在 push/PR 上跑同一条，不靠人记得。
 
 ---
 
@@ -178,7 +179,7 @@ dev-agent-kit/
   fixtures/
     README.md
     dry-run.ps1                      # 假项目空跑验收（TEMP 副本；可选 -RequireBash）
-    fake-project/                    # 靶场骨架（无内嵌 scripts，由 dry-run 从 templates 拷入）
+    fake-project/                    # 靶场骨架（无 scripts、无 adapter 副本；dry-run 从 templates + adapters 注入 TEMP）
 ```
 
 ---

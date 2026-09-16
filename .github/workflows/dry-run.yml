@@ -1,0 +1,19 @@
+name: dry-run
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  kit-dry-run:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+      - name: fixtures/dry-run.ps1
+        shell: powershell
+        run: .\fixtures\dry-run.ps1 -RequireBash

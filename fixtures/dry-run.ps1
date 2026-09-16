@@ -49,6 +49,23 @@ try {
   Copy-Item (Join-Path $KitRoot "adapters\workbuddy\rules\*") (Join-Path $work ".codebuddy\rules") -Force -ErrorAction SilentlyContinue
   Copy-Item (Join-Path $KitRoot "adapters\qoder\rules\*") (Join-Path $work ".qoder\rules") -Force -ErrorAction SilentlyContinue
 
+  # Fixture skeleton must not ship adapter overlays (stale copies mislead; dry-run injects from adapters/)
+  $overlayLeak = @(
+    "CLAUDE.md", "CODEBUDDY.md",
+    ".cursor\rules\tooling.mdc", ".cursor\rules\coding.mdc", ".cursor\rules\project-progress.mdc",
+    ".kiro\steering\tooling.md", ".kiro\steering\coding.md", ".kiro\steering\project-progress.md",
+    ".codebuddy\rules\tooling.md", ".codebuddy\rules\project-progress.md",
+    ".qoder\rules\tooling.md", ".qoder\rules\project-progress.md"
+  )
+  $leakN = 0
+  foreach ($rel in $overlayLeak) {
+    if (Test-Path (Join-Path $FixtureSrc $rel)) {
+      Bad "fixture ships adapter overlay $rel (delete it; dry-run copies from adapters/)"
+      $leakN++
+    }
+  }
+  if ($leakN -eq 0) { Ok "fixture has no adapter overlay copies" }
+
   $must = @(
     "scripts\db.ps1", "scripts\lint.ps1", "scripts\smoke.ps1", "scripts\api-check.ps1",
     "scripts\db.sh", "scripts\lint.sh", "scripts\smoke.sh", "scripts\api-check.sh",
@@ -100,9 +117,18 @@ try {
       $env:PATH = "C:\no-such-bin"
       & .\scripts\lint.ps1 ".\backend\sample_ok.php" 2>$null | Out-Null
       $lintMissing = $LASTEXITCODE
+      if ($lintMissing -eq 2) { Ok "lint missing dep exit 2" } else { Bad "lint missing dep expected exit 2, got $lintMissing" }
+
+      # Checker path exists but is not runnable: must be exit 2, not leftover 1 from db/cmd
+      $bogus = Join-Path $work "not-a-php.txt"
+      Set-Content -Path $bogus -Value "not php" -Encoding ascii
+      $env:LZ_PHP = $bogus
+      $global:LASTEXITCODE = 1
+      & .\scripts\lint.ps1 ".\backend\sample_ok.php" 2>$null | Out-Null
+      $lintStale = $LASTEXITCODE
       $env:PATH = $savedPath
       $env:LZ_PHP = $oldPhp
-      if ($lintMissing -eq 2) { Ok "lint missing dep exit 2" } else { Bad "lint missing dep expected exit 2, got $lintMissing" }
+      if ($lintStale -eq 2) { Ok "lint checker-did-not-run exit 2 (not leftover 1)" } else { Bad "lint expected exit 2 when checker did not run, got $lintStale" }
     }
 
     # --- api-check ---
@@ -154,6 +180,17 @@ try {
 
     # --- install.ps1 merge-safe (against this workdir as "project") ---
     $install = Join-Path $KitRoot "skills\scaffold-dev-agent\scripts\install.ps1"
+    $installSh = Join-Path $KitRoot "skills\scaffold-dev-agent\scripts\install.sh"
+    if (-not (Test-Path $installSh)) {
+      Bad "install.sh missing"
+    } else {
+      $installShText = Get-Content $installSh -Raw
+      if ($installShText -match '\.kit-new' -and $installShText -match 'exit 2') {
+        Ok "install.sh source has merge-safe (.kit-new + exit 2)"
+      } else {
+        Bad "install.sh missing merge-safe markers (.kit-new / exit 2)"
+      }
+    }
     & $install -KitRoot $KitRoot -ProjectRoot $work -Adapters "cursor,claude" 2>&1 | Out-Host
     if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {
       Ok "install.ps1 merge-safe exit=$LASTEXITCODE"
@@ -189,6 +226,22 @@ try {
       if ($LASTEXITCODE -eq 1) { Ok "db.sh blocks multi-statement" } else { Bad "db.sh multi-statement expected exit 1, got $LASTEXITCODE" }
       & $gitBash $dbSh "SELECT 1\gDROP TABLE users" 2>$null | Out-Null
       if ($LASTEXITCODE -eq 1) { Ok "db.sh blocks \\g" } else { Bad "db.sh \\g expected exit 1, got $LASTEXITCODE" }
+
+      if (Test-Path $installSh) {
+        $tmpInstall = Join-Path $work "_install.sh"
+        $lfInstall = ([IO.File]::ReadAllText($installSh) -replace "`r`n", "`n" -replace "`r", "`n")
+        [IO.File]::WriteAllText($tmpInstall, $lfInstall, (New-Object System.Text.UTF8Encoding $false))
+        & $gitBash -n $tmpInstall 2>$null
+        if ($LASTEXITCODE -eq 0) { Ok "install.sh bash -n syntax OK" } else { Bad "install.sh bash -n failed exit=$LASTEXITCODE" }
+        $kitUnix = ($KitRoot -replace '\\', '/')
+        $workUnix = ($work -replace '\\', '/')
+        & $gitBash $tmpInstall $kitUnix $workUnix "cursor,claude" 2>&1 | Out-Host
+        if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {
+          Ok "install.sh merge-safe exit=$LASTEXITCODE"
+        } else {
+          Bad "install.sh unexpected exit $LASTEXITCODE"
+        }
+      }
     } else {
       Write-Host "[WARN] Git Bash not found; .sh runtime checks skipped (source asserts still ran). Install Git for Windows or pass -RequireBash." -ForegroundColor Yellow
       if ($RequireBash) { Bad "RequireBash set but no usable bash found" }

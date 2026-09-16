@@ -44,12 +44,19 @@ if (Test-Path $fullTarget -PathType Container) {
 
 $fail = 0
 foreach ($f in $files) {
+    # LASTEXITCODE is process-wide. A previous native/script (e.g. db.ps1 in the
+    # same dry-run) can leave 1. If & $php never starts, that leftover looks like
+    # a syntax error (exit 1) instead of "checker did not run" (exit 2).
+    # Must set $global:LASTEXITCODE (a bare $LASTEXITCODE = $null creates a
+    # script-local that shadows the real code and never updates). Use $null not 0:
+    # 0 would hide a failed start as OK.
+    $global:LASTEXITCODE = $null
     $out = & $php -l $f.FullName 2>&1                                # ADAPT invocation
-    if ($null -eq $LASTEXITCODE) {
+    if ($null -eq $global:LASTEXITCODE) {
         Write-Error "checker did not run (no exit code). Check `$env:LZ_PHP / PATH. (NOT a syntax error.)"
         exit 2
     }
-    if ($LASTEXITCODE -ne 0) {
+    if ($global:LASTEXITCODE -ne 0) {
         $fail++
         Write-Host $out -ForegroundColor Red
     }
