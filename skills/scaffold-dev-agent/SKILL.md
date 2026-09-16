@@ -97,6 +97,7 @@ Read both sides; keep project facts; add kit tooling; delete `*.kit-new`.
 ### 5–6) Adapt + verify
 
 `# ADAPT` lint/smoke/api-check paths; then spot-check tools.
+**Also run [init-workflow.md](init-workflow.md) Step D** (BOM / path normalize / curl status / empty env Join-Path) — install only copies files; it does not prove scripts work.
 
 ## Daily tools
 

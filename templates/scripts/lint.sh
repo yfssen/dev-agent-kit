@@ -3,9 +3,13 @@
 # Missing dependency -> exit 2 (NOT a false "syntax error"). Real error -> exit 1.
 # ADAPT: replace the checker resolution + invocation for your stack.
 #   PHP:    php -l "$file"
-#   Node:   npx tsc --noEmit
+#   Node:   npx eslint / npx tsc --noEmit (if you cd into a subapp, resolve TARGET vs ROOT first)
 #   Python: ruff check "$target" / mypy "$target"
 # Encoding: ASCII-only (no BOM). Put Chinese notes in .md files.
+#
+# Trap (D2): if you "cd" into a subdir then call a tool, resolve relative paths against
+# the WORKSPACE ROOT first, then strip the subdir prefix. Otherwise eslint/tsc look for
+# "vue-app/vue-app/..." and report a false FAIL (exit 1).
 
 set -eu
 
@@ -14,6 +18,13 @@ if [ "${1:-}" = "" ]; then
   exit 2
 fi
 TARGET="$1"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Resolve relative paths against workspace root (same as lint.ps1).
+case "$TARGET" in
+  /* | [A-Za-z]:*) ABS="$TARGET" ;;
+  *) ABS="$ROOT/$TARGET" ;;
+esac
 
 # --- Resolve checker (example: PHP CLI) ---   # ADAPT
 PHP_BIN=""
@@ -27,14 +38,14 @@ if [ -z "$PHP_BIN" ]; then
   exit 2
 fi
 
-if [ ! -e "$TARGET" ]; then
+if [ ! -e "$ABS" ]; then
   echo "Target not found: $TARGET" >&2
   exit 2
 fi
 
 fail=0
 count=0
-if [ -d "$TARGET" ]; then
+if [ -d "$ABS" ]; then
   # ADAPT extension: *.php
   while IFS= read -r -d '' f; do
     count=$((count + 1))
@@ -42,10 +53,10 @@ if [ -d "$TARGET" ]; then
       fail=$((fail + 1))
       printf '%s\n' "$out"
     fi
-  done < <(find "$TARGET" -type f -name '*.php' -print0)
+  done < <(find "$ABS" -type f -name '*.php' -print0)
 else
   count=1
-  if ! out=$("$PHP_BIN" -l "$TARGET" 2>&1); then
+  if ! out=$("$PHP_BIN" -l "$ABS" 2>&1); then
     fail=$((fail + 1))
     printf '%s\n' "$out"
   fi

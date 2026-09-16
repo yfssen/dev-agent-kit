@@ -124,6 +124,26 @@ Learn progress:
 - [ ] api-check once if feasible (else N/A)
 ```
 
+## Step D — Tool-layer self-check（装完必查，别信「已安装」）
+
+安装脚本只保证文件到位，不保证脚本**能跑对**。逐项实测，别只看 exit code：
+
+1. **BOM**：`scan-project.ps1` 等写文件的脚本，确认输出首字节不是 `EF BB BF`。
+   PowerShell 5.1 的 `Set-Content -Encoding utf8` **会写 BOM**；用
+   `[System.IO.File]::WriteAllText($p, $t, (New-Object System.Text.UTF8Encoding($false)))`。
+2. **相对路径归一化**：`.sh` 里若先 `cd` 到子目录再调外部工具，必须先把用户给的相对路径
+   按**工作区根**解析成绝对路径再剥离子目录前缀；否则子目录内查不到文件，报成假 FAIL。
+   `.ps1` 与 `.sh` 两个版本要行为一致。
+3. **curl 状态码**：`curl -w "%{http_code}" ... || echo "000"` 在 curl 非零退出但仍打印状态码时
+   会拼成 `200000`。改为「输出为空才回退 000」。
+4. **环境变量可能为空**：`Join-Path $env:ProgramFiles ...` 在 `$env:ProgramFiles` 为空时抛参数绑定
+   错误并**中止整个候选块**（后续候选也不会试）。所有 Join-Path 的 base 都要先判空。
+5. **本机 Node 版本**：默认 PATH 上的 Node 可能 `<18`。候选顺序建议
+   PATH → `D:\tools\node` → Volta → `~/.workbuddy-ai/binaries/node/versions/*`（取最高版本）。
+6. **产物核实**：有生成器（如 `tools/*.mjs`）的项目，别只信脚本写好了 —— **确认产物真的落盘**，
+   并逐个校验站内链接可达（`scan-project` 不查断链）。
+7. **别急着记缺口**：产物可能在你看之前几分钟才生成。下结论前重新 `ls`/`stat` 一次。
+
 ## Done when
 
 - [ ] User was asked for MySQL; either `.env` written + 复盘 filled, **or** 复盘 marked 跳过（无库）

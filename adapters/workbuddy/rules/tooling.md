@@ -18,6 +18,8 @@ enabled: true
 - 冒烟：`./scripts/smoke.ps1` 或 `./scripts/smoke.sh`
 - 对账：`./scripts/api-check.ps1` 或 `./scripts/api-check.sh`
 
+ADAPT 陷阱：相对路径先按工作区根解析再 `cd` 子目录；`curl … || echo 000` 会拼成 `200000`；`Join-Path` 的 env base 可能为空须先判空；写文件勿用 PS5.1 的 `Set-Content -Encoding utf8`（会带 BOM）。
+
 ## 闭环
 
 ```

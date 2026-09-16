@@ -4,6 +4,10 @@
 # PASS = HTTP 200 + JSON has expected shape. WARN = alive but business error. FAIL = network/404.
 # ADAPT: BaseUrl default, the token fixture path, and the endpoint lists.
 # Encoding: ASCII-only (no BOM). Put Chinese notes in .md files.
+#
+# Trap (D3): NEVER write:  code=$(curl -w "%{http_code}" ... || echo "000")
+# curl may print "200" then exit non-zero; || appends "000" -> "200000" which still
+# matches ^2 and falsely PASS. Use http_code() below when you need status codes.
 
 set -eu
 
@@ -19,6 +23,15 @@ while [ "${1:-}" != "" ]; do
 done
 
 pass=0; warn=0; fail=0
+
+# Safe HTTP status helper for page smoke / ADAPT. Empty output -> "000".
+http_code() {
+  local url="$1"
+  local code
+  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 15 "$url" 2>/dev/null || true)
+  if [ -z "$code" ]; then code="000"; fi
+  printf '%s' "$code"
+}
 
 # Returns body on stdout; exit 0 on HTTP success-ish curl, else non-zero.
 invoke_api() {
