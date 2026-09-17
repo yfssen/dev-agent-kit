@@ -28,7 +28,10 @@ fi
 
 # Temporary files for rows
 TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
+# Cleanup must NOT change the exit code: a failing rm (locked dir, or a shell
+# that wraps rm) would turn a CLEAN reconcile into exit 1 -- a false FAIL.
+cleanup() { rm -rf "$TMP" 2>/dev/null || true; }
+trap cleanup EXIT
 : >"$TMP/rows"
 
 # Index api controllers: name(lower)|fullpath

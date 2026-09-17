@@ -56,12 +56,36 @@ tmp=$(mktemp)
   done
   echo ""
   echo "## Git hot files (last 20 commits, top 12)"
-  if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git -C "$ROOT" -c core.quotepath=false log -20 --name-only --pretty=format: 2>/dev/null | sed '/^$/d' | sort | uniq -c | sort -nr | head -n 12 | while read -r c f; do
-      echo "- $c $f"
-    done
+  # Git for Windows does not accept msys paths (/e/www/...). cd in bash, then git
+  # without -C. If root is not a repo, fall back to a single child .git (dual-git
+  # parent workspace). 0 or 2+ children: report why, do not guess.
+  if ! command -v git >/dev/null 2>&1; then
+    echo "- skipped: git not on PATH"
   else
-    echo "- skipped: git missing or not a git work tree"
+    repo=""
+    if (cd "$ROOT" 2>/dev/null && git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
+      repo="$ROOT"
+    else
+      child_count=0
+      child_repo=""
+      for p in "$ROOT"/*; do
+        [ -d "$p/.git" ] || continue
+        child_count=$((child_count + 1))
+        child_repo="$p"
+      done
+      if [ "$child_count" -eq 1 ]; then repo="$child_repo"; fi
+    fi
+    if [ -z "$repo" ]; then
+      echo "- skipped: root is not a git work tree and no single child repo found"
+    else
+      if [ "$repo" = "$ROOT" ]; then echo "- repo: ."; else echo "- repo: ${repo#"$ROOT"/}"; fi
+      (
+        cd "$repo" || exit 0
+        git -c core.quotepath=false log -20 --name-only --pretty=format: 2>/dev/null \
+          | sed '/^$/d' | sort | uniq -c | sort -nr | head -n 12 \
+          | while read -r c f; do echo "- $c $f"; done
+      )
+    fi
   fi
   echo ""
   echo "## Next"
@@ -80,4 +104,6 @@ if [ -n "$OUT" ]; then
   cp "$tmp" "$dest"
   echo "Wrote $dest"
 fi
-rm -f "$tmp"
+# Temp removal is housekeeping. With set -e, a wrapped/locked rm would turn a
+# successful scan into exit 1 (false FAIL).
+rm -f "$tmp" 2>/dev/null || true

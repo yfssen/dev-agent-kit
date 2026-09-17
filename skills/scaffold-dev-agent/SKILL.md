@@ -84,6 +84,12 @@ exit 0 = clean; exit 2 = MERGE_NEEDED.
 
 Read both sides; keep project facts; add kit tooling; delete `*.kit-new`.
 
+Before merging line by line, classify each MERGE:
+
+- Kit side is an **unfilled template** (placeholders like `<one-liner>` / `NN%` / `YYYY-MM-DD`) -> keep the project version, just delete the `*.kit-new`.
+- Kit side is a **pure superset** (project never diverged) -> take the kit version as-is.
+- Both sides have unique content -> only these need a real line-by-line merge.
+
 ### 4) Project init/learn（一口气做完）
 
 **Follow [init-workflow.md](init-workflow.md).** Summary:

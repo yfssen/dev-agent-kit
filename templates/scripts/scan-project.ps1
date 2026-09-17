@@ -90,23 +90,33 @@ $gitCmd = Get-Command git -ErrorAction SilentlyContinue
 if (-not $gitCmd) {
     L "- skipped: git not on PATH"
 } else {
-    Push-Location $Root
-    try {
-        git rev-parse --is-inside-work-tree 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            L "- skipped: not a git work tree"
-        } else {
-            $names = @(git -c core.quotepath=false log -20 --name-only --pretty=format: 2>$null | Where-Object { $_ })
-            $counts = @{}
-            foreach ($n in $names) {
-                if (-not $counts.ContainsKey($n)) { $counts[$n] = 0 }
-                $counts[$n]++
-            }
-            $top = @($counts.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 12)
-            if ($top.Count -eq 0) { L "- none (empty log)" }
-            else { foreach ($e in $top) { L ("- " + $e.Value + " " + $e.Key) } }
+    # Root itself, else exactly one child with .git (parent workspace / dual-git).
+    # git -C is OK here: PowerShell passes a native Windows path, not msys /e/...
+    $repo = $null
+    $global:LASTEXITCODE = $null
+    git -C $Root rev-parse --is-inside-work-tree 2>$null | Out-Null
+    if ($global:LASTEXITCODE -eq 0) {
+        $repo = $Root
+    } else {
+        $childRepos = @(Get-ChildItem $Root -Directory -Force -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path (Join-Path $_.FullName ".git") })
+        if ($childRepos.Count -eq 1) { $repo = $childRepos[0].FullName }
+    }
+    if (-not $repo) {
+        L "- skipped: root is not a git work tree and no single child repo found"
+    } else {
+        $repoRel = if ($repo -eq $Root) { "." } else { $repo.Substring($Root.Length).TrimStart('\', '/') }
+        L ("- repo: " + $repoRel)
+        $names = @(git -C $repo -c core.quotepath=false log -20 --name-only --pretty=format: 2>$null | Where-Object { $_ })
+        $counts = @{}
+        foreach ($n in $names) {
+            if (-not $counts.ContainsKey($n)) { $counts[$n] = 0 }
+            $counts[$n]++
         }
-    } finally { Pop-Location }
+        $top = @($counts.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 12)
+        if ($top.Count -eq 0) { L "- none (empty log)" }
+        else { foreach ($e in $top) { L ("- " + $e.Value + " " + $e.Key) } }
+    }
 }
 L ""
 L "## Next"
