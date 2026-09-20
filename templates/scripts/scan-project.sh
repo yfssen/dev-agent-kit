@@ -81,9 +81,22 @@ tmp=$(mktemp)
       if [ "$repo" = "$ROOT" ]; then echo "- repo: ."; else echo "- repo: ${repo#"$ROOT"/}"; fi
       (
         cd "$repo" || exit 0
+        # Two processes (git + awk), not git|sed|sort|uniq|sort|head — hosts that wrap
+        # every external command will kill a long pipeline before it finishes.
         git -c core.quotepath=false log -20 --name-only --pretty=format: 2>/dev/null \
-          | sed '/^$/d' | sort | uniq -c | sort -nr | head -n 12 \
-          | while read -r c f; do echo "- $c $f"; done
+          | awk 'NF { c[$0]++ }
+                 END {
+                   n = 0
+                   for (i = 0; i < 12; i++) {
+                     best = 0; pick = ""
+                     for (f in c) if (c[f] > best) { best = c[f]; pick = f }
+                     if (best == 0) break
+                     print "- " best, pick
+                     delete c[pick]
+                     n++
+                   }
+                   if (n == 0) print "- none (empty log)"
+                 }'
       )
     fi
   fi

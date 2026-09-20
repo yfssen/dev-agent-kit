@@ -103,7 +103,7 @@ Before merging line by line, classify each MERGE:
 ### 5–6) Adapt + verify
 
 `# ADAPT` lint/smoke/api-check paths; then spot-check tools.
-**Also run [init-workflow.md](init-workflow.md) Step D** (BOM / path normalize / curl status / empty env Join-Path) — install only copies files; it does not prove scripts work.
+**Also run [init-workflow.md](init-workflow.md) Step D** (BOM / path normalize / curl status / empty env Join-Path / PATHEXT / scan hot files actually printed) — install only copies files; it does not prove scripts work.
 
 ## Daily tools
 

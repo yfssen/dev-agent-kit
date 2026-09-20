@@ -145,6 +145,12 @@ Daily after init: locate via SSOT / `rg` / scan Git hot files; read only the hit
 6. **产物核实**：有生成器（如 `tools/*.mjs`）的项目，别只信脚本写好了 —— **确认产物真的落盘**，
    并逐个校验站内链接可达（`scan-project` 不查断链）。
 7. **别急着记缺口**：产物可能在你看之前几分钟才生成。下结论前重新 `ls`/`stat` 一次。
+8. **Windows PATHEXT 可能被截断**：环境块过大时 `$env:PATHEXT` 可能丢掉 `.EXE` / `.CMD`。
+   `Get-Command node`/`npm` 会命中同名 `.js` 或直接找不到，报成「缺 Node」。
+   先看 PATHEXT 是否还含 `.EXE` 与 `.CMD`；解析 checker 用 **`.exe`/`.cmd` 全路径**（或 `LZ_PHP` / 同等变量），不要靠无扩展名命令。
+9. **长管道会被进程创建开销掐断**：会包装/审计每条外部命令的环境里，
+   `git | sed | sort | uniq | head` 这种串可能卡住、空输出或中途退出——不一定是 git 失败。
+   实测 `scan-project` 时确认 **Git hot files 段真有行**（或明确的 skipped 原因）；ADAPT 时少 fork，中间结果写临时文件。
 
 ## Done when
 
@@ -152,4 +158,4 @@ Daily after init: locate via SSOT / `rg` / scan Git hot files; read only the hit
 - [ ] `docs/项目结构与架构.md` + `AGENTS.md` + SSOT seeded
 - [ ] If has DB: `db`/`mysql` `.env` path correct; if 无库: docs state 待建
 - [ ] New chat can work without re-asking architecture (may still need DB if `.env` missing and project now has a backend)
-- [ ] **Step D 实测通过**（工具层真的能跑，不只是「文件已拷贝」）——BOM / 相对路径 / curl 状态码 / 空环境变量 Join-Path 逐项验过；**未过 Step D 不算装完**
+- [ ] **Step D 实测通过**（工具层真的能跑，不只是「文件已拷贝」）——BOM / 相对路径 / curl 状态码 / 空环境变量 Join-Path / PATHEXT / 热文件段有输出，逐项验过；**未过 Step D 不算装完**
