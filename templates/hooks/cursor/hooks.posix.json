@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "bash .cursor/hooks/guard-shell.sh"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "bash .cursor/hooks/auto-lint.sh",
+        "matcher": "Write"
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "bash .cursor/hooks/backup-ssot.sh"
+      }
+    ],
+    "stop": [
+      {
+        "command": "bash .cursor/hooks/ssot-reminder.sh",
+        "loop_limit": 1
+      }
+    ]
+  }
+}

@@ -2,6 +2,9 @@
 # Install core + adapters. Never overwrite existing files unless --force.
 # Existing dest -> write sibling "*.kit-new" and report MERGE.
 # Usage: ./install.sh <kit-root> <project-root> [cursor,claude,kiro] [--force]
+# Adapter "auto": detect adapters already installed in the project and re-sync
+#   them merge-safe (one stable command upgrades any project), then report any
+#   opt-in capability layers (e.g. hooks) the kit offers but the project lacks.
 
 set -eu
 KIT=$(CDPATH= cd -- "${1:?kit root}" && pwd)
@@ -87,8 +90,42 @@ if [ -d "$KIT/templates/scripts" ]; then
   chmod +x "$PROJ/scripts/"*.sh 2>/dev/null || true
 fi
 
+# Opt-in capability layers (not AI-tool choices). "auto" reports missing ones only.
+CAP_LAYERS="hooks"
+
+detect_adapters() {
+  root="$1"; out=""
+  if [ -d "$root/.cursor/rules" ] && ls "$root/.cursor/rules/"*.mdc >/dev/null 2>&1; then out="$out cursor"; fi
+  [ -f "$root/CLAUDE.md" ] && out="$out claude"
+  [ -d "$root/.kiro/steering" ] && out="$out kiro"
+  { [ -f "$root/CODEBUDDY.md" ] || [ -d "$root/.codebuddy" ]; } && out="$out workbuddy"
+  [ -d "$root/.qoder/rules" ] && out="$out qoder"
+  [ -f "$root/.cursor/hooks.json" ] && out="$out hooks"
+  echo "$out"
+}
+
 IFS=',' read -r -a wanted <<< "$ADAPTERS"
+
+# "auto": expand to whatever the project already has, so one command re-syncs any project.
+has_auto=0
 for a in "${wanted[@]}"; do
+  case "$(echo "$a" | tr '[:upper:]' '[:lower:]' | tr -d ' ')" in auto) has_auto=1 ;; esac
+done
+if [ "$has_auto" = "1" ]; then
+  detected="$(detect_adapters "$PROJ")"
+  echo "AUTO-DETECTED adapters:${detected:- (none; fresh project)}"
+  newlist=""
+  for a in "${wanted[@]}" $detected; do
+    a=$(echo "$a" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+    [ -n "$a" ] || continue
+    [ "$a" = "auto" ] && continue
+    case " $newlist " in *" $a "*) ;; *) newlist="$newlist $a" ;; esac
+  done
+  wanted=()
+  for a in $newlist; do wanted+=("$a"); done
+fi
+
+for a in ${wanted[@]+"${wanted[@]}"}; do
   a=$(echo "$a" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
   [ -n "$a" ] || continue
   case "$a" in
@@ -145,6 +182,18 @@ for a in "${wanted[@]}"; do
       done
       echo "[OK] adapter qoder (AGENTS.md + .qoder/rules)"
       ;;
+    hooks)
+      # Deterministic guardrails (Cursor): guard-shell / auto-lint / backup-ssot.
+      install_file "$KIT/templates/hooks/cursor/hooks.json" "$PROJ/.cursor/hooks.json"
+      install_file "$KIT/templates/hooks/cursor/hooks.posix.json" "$PROJ/.cursor/hooks.posix.json"
+      mkdir -p "$PROJ/.cursor/hooks"
+      for f in "$KIT/templates/hooks/cursor/hooks/"*; do
+        [ -f "$f" ] || continue
+        install_file "$f" "$PROJ/.cursor/hooks/$(basename "$f")"
+      done
+      chmod +x "$PROJ/.cursor/hooks/"*.sh 2>/dev/null || true
+      echo "[OK] adapter hooks (Cursor .cursor/hooks.json + hooks/; mac/linux: use hooks.posix.json)"
+      ;;
     *)
       echo "[SKIP] unknown adapter: $a"
       ;;
@@ -153,6 +202,16 @@ done
 
 echo ""
 echo "== Summary: NEW/FORCE=$added MERGE_NEEDED=$merged SAME=$same =="
+
+# Report opt-in capability layers the kit offers but the project does not have yet.
+installed_now="$(detect_adapters "$PROJ")"
+for cap in $CAP_LAYERS; do
+  case " $installed_now " in
+    *" $cap "*) ;;
+    *) echo "[AVAILABLE] optional capability not installed: $cap -- re-run with adapter '$cap' to add it" ;;
+  esac
+done
+
 if [ "$merged" -gt 0 ]; then
   echo "Merge these (read existing + *.kit-new, keep project facts, add kit tooling):"
   printf '%s\n' "$merge_list"

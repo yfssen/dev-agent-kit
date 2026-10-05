@@ -75,6 +75,7 @@ chmod +x install-global.sh && ./install-global.sh
    - Claude Code → `adapters/claude/CLAUDE.md` → 根目录
    - Codex → 通常只需 `AGENTS.md`
    - Kiro → `adapters/kiro/steering/*` → `.kiro/steering/`
+   - （可选）Cursor 钩子护栏 → 安装器加 `hooks` token → `.cursor/hooks.json` + `.cursor/hooks/*`，见 `templates/hooks/README.md`
 
 ### 步骤 2 — 适配脚本（按栈替换实现）
 
@@ -163,6 +164,11 @@ dev-agent-kit/
       lint.ps1 / lint.sh             # 自检
       smoke.ps1 / smoke.sh           # 验证
       api-check.ps1 / api-check.sh   # 对账
+    hooks/                           # 可选：Cursor 钩子护栏（见 hooks/README.md）
+      README.md                      # 装什么 / 怎么适配 / 怎么验证
+      cursor/hooks.json              # Windows（.ps1）
+      cursor/hooks.posix.json        # mac/linux（.sh）
+      cursor/hooks/*                 # guard-shell / auto-lint / backup-ssot
   fixtures/
     README.md
     dry-run.ps1                      # 假项目空跑验收（TEMP 副本；可选 -RequireBash）

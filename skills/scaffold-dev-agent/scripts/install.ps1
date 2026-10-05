@@ -1,6 +1,9 @@
 # Install core + adapters. Never overwrite existing files unless -Force.
 # Existing dest -> write sibling "*.kit-new" and report MERGE.
 # Usage: .\install.ps1 -KitRoot <kit> -ProjectRoot <proj> [-Adapters cursor,claude,kiro] [-Force]
+# -Adapters auto : detect adapters already installed in the project and re-sync
+#   them merge-safe (one stable command upgrades any project), then report any
+#   opt-in capability layers (e.g. hooks) the kit offers but the project lacks.
 
 param(
     [Parameter(Mandatory = $true)][string]$KitRoot,
@@ -74,6 +77,30 @@ Get-ChildItem $scriptsSrc -File -ErrorAction SilentlyContinue | ForEach-Object {
 
 $wanted = @($Adapters.Split(",") | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ })
 
+# Opt-in capability layers (not AI-tool choices). "auto" never force-adds these;
+# it only reports the missing ones so you can decide to opt in.
+$capabilityLayers = @('hooks')
+
+function Detect-Adapters([string]$root) {
+    $found = New-Object System.Collections.Generic.List[string]
+    $rules = Join-Path $root ".cursor\rules"
+    if ((Test-Path $rules) -and (Get-ChildItem $rules -Filter *.mdc -File -ErrorAction SilentlyContinue)) { $found.Add("cursor") | Out-Null }
+    if (Test-Path (Join-Path $root "CLAUDE.md")) { $found.Add("claude") | Out-Null }
+    if (Test-Path (Join-Path $root ".kiro\steering")) { $found.Add("kiro") | Out-Null }
+    if ((Test-Path (Join-Path $root "CODEBUDDY.md")) -or (Test-Path (Join-Path $root ".codebuddy"))) { $found.Add("workbuddy") | Out-Null }
+    if (Test-Path (Join-Path $root ".qoder\rules")) { $found.Add("qoder") | Out-Null }
+    if (Test-Path (Join-Path $root ".cursor\hooks.json")) { $found.Add("hooks") | Out-Null }
+    return $found
+}
+
+# "auto": expand to whatever the project already has, so one command re-syncs any project.
+if ($wanted -contains "auto") {
+    $detected = @(Detect-Adapters $ProjectRoot)
+    $wanted = @($wanted | Where-Object { $_ -ne "auto" })
+    $wanted = @(($wanted + $detected) | Select-Object -Unique)
+    Write-Host ("AUTO-DETECTED adapters: " + $(if ($detected.Count) { [string]::Join(', ', $detected) } else { '(none; fresh project)' }))
+}
+
 foreach ($a in $wanted) {
     switch ($a) {
         "cursor" {
@@ -123,6 +150,17 @@ foreach ($a in $wanted) {
             }
             Write-Host "[OK] adapter qoder (AGENTS.md + .qoder/rules)"
         }
+        "hooks" {
+            # Deterministic guardrails (Cursor): guard-shell / auto-lint / backup-ssot.
+            $hookSrc = Join-Path $KitRoot "templates\hooks\cursor"
+            Install-File (Join-Path $hookSrc "hooks.json") (Join-Path $ProjectRoot ".cursor\hooks.json")
+            Install-File (Join-Path $hookSrc "hooks.posix.json") (Join-Path $ProjectRoot ".cursor\hooks.posix.json")
+            Ensure-Dir (Join-Path $ProjectRoot ".cursor\hooks")
+            Get-ChildItem (Join-Path $hookSrc "hooks") -File | ForEach-Object {
+                Install-File $_.FullName (Join-Path (Join-Path $ProjectRoot ".cursor\hooks") $_.Name)
+            }
+            Write-Host "[OK] adapter hooks (Cursor .cursor/hooks.json + hooks/; mac/linux: rename hooks.posix.json -> hooks.json)"
+        }
         default {
             Write-Host "[SKIP] unknown adapter: $a"
         }
@@ -131,6 +169,15 @@ foreach ($a in $wanted) {
 
 Write-Host ""
 Write-Host "== Summary: NEW/FORCE=$added MERGE_NEEDED=$merged SAME=$skippedSame =="
+
+# Report opt-in capability layers the kit offers but the project does not have yet.
+$installedNow = @(Detect-Adapters $ProjectRoot)
+foreach ($cap in $capabilityLayers) {
+    if ($installedNow -notcontains $cap) {
+        Write-Host "[AVAILABLE] optional capability not installed: $cap -- re-run with -Adapters $cap to add it"
+    }
+}
+
 if ($mergeList.Count -gt 0) {
     Write-Host "Merge these (read existing + *.kit-new, keep project facts, add kit tooling):"
     foreach ($m in $mergeList) { Write-Host "  - $m" }
