@@ -21,6 +21,7 @@
 - **fail-open**：钩子脚本自己出错时默认放行，不会因为钩子挂了导致整个 shell 用不了。
 - **响亮地失败对齐**：`lint` 退出码 `2`（检查器缺失，如没装 php）会被**跳过**，不冒充成代码错误；只有退出码 `1`（真语法错）才回灌。
 - **提醒不强制**：`ssot-reminder` 只在「改了代码、没改 SSOT」时软提醒一次，20 分钟内不再重复（靠 `.cursor/hooks/.ssot-nudge-last` 冷却），`hooks.json` 里又加了 `loop_limit: 1` 兜底，不会卡住迭代。它只看**工作区未提交改动**，不依赖任何向量库——这就是 kit 的「跨会话记忆」：记忆存在 git 里的 markdown，这个钩子只负责催你保持它新鲜。
+- **完成闸是 `verify`，不是钩子**：钩子是过程中的护栏；声称任务做完前必须跑 `scripts/verify`（lint + api-check + SSOT + 可选 smoke），`Result: PASS` 才算过。
 
 ---
 

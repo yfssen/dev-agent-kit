@@ -67,8 +67,8 @@ try {
   if ($leakN -eq 0) { Ok "fixture has no adapter overlay copies" }
 
   $must = @(
-    "scripts\db.ps1", "scripts\lint.ps1", "scripts\smoke.ps1", "scripts\api-check.ps1",
-    "scripts\db.sh", "scripts\lint.sh", "scripts\smoke.sh", "scripts\api-check.sh",
+    "scripts\db.ps1", "scripts\lint.ps1", "scripts\smoke.ps1", "scripts\api-check.ps1", "scripts\verify.ps1",
+    "scripts\db.sh", "scripts\lint.sh", "scripts\smoke.sh", "scripts\api-check.sh", "scripts\verify.sh",
     "scripts\mysql.ps1", "scripts\mysql.sh",
     "scripts\scan-project.ps1", "scripts\scan-project.sh",
     "scripts\apply-mysql-dsn.ps1", "scripts\apply-mysql-dsn.sh",
@@ -142,6 +142,29 @@ try {
       if ($ncN -ge 1) { Ok "api-check NO_CONTROLLER=$ncN" } else { Bad "api-check expected NO_CONTROLLER>=1" }
     } else {
       Bad "api-check summary not parsed"
+    }
+
+    # --- verify gate ---
+    $verifyLines = @(& .\scripts\verify.ps1 2>&1 | ForEach-Object { "$_" })
+    $verifyLines | ForEach-Object { Write-Host $_ }
+    $vText = $verifyLines -join "`n"
+    if ($vText -match '\[FAIL\] api-check') { Ok "verify flags fixture api-check FAIL" } else { Bad "verify should FAIL api-check on fixture" }
+    if ($vText -match '\[SKIP\] smoke') { Ok "verify skips smoke when server down" } else { Bad "verify should SKIP smoke without server" }
+    if ($vText -match '== Result: FAIL') { Ok "verify Result FAIL when a check FAILs" } else { Bad "verify should print Result FAIL" }
+
+    # Fixture copy is not a repo; init one to exercise lint + SSOT WARN.
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+      & git init -q 2>$null
+      & git -c user.email=kit@example.com -c user.name=kit add -A 2>$null
+      & git -c user.email=kit@example.com -c user.name=kit commit -qm dryrun-init 2>$null
+      Add-Content -Path ".\backend\sample_ok.php" -Value "`n// dry-run edit" -Encoding ascii
+      $verify2 = @(& .\scripts\verify.ps1 2>&1 | ForEach-Object { "$_" })
+      $verify2 | ForEach-Object { Write-Host $_ }
+      $v2 = $verify2 -join "`n"
+      if ($v2 -match '\[PASS\] lint -- 1 changed') { Ok "verify lints dirty php" } else { Bad "verify should PASS lint on 1 dirty php" }
+      if ($v2 -match '\[WARN\] ssot') { Ok "verify WARNs stale SSOT" } else { Bad "verify should WARN when code changed but SSOT not updated" }
+    } else {
+      Write-Host "[WARN] git not available; verify lint/ssot git cases skipped" -ForegroundColor Yellow
     }
 
     # --- smoke ---

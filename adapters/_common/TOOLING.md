@@ -64,13 +64,26 @@
 - **这是错位表的对账源**：更新 SSOT 前先跑它拿真实清单
 - 默认只打 **Summary + 前 20 条错位**（省 token）；全量用 `./scripts/api-check.ps1 -All` 或 `ALL=1 ./scripts/api-check.sh`
 
-## 5. 标准工作闭环
+## 5. 验收闸（完成的定义；改完必跑）
+
+```
+./scripts/verify.ps1                 # 可选 -Target <文件>  -Full  -SsotStrict
+./scripts/verify.sh                  # 可选 --target <文件> --full --ssot-strict
+```
+
+一条命令串起上面的 lint（git 改动的代码文件）+ api-check + SSOT 是否回写 + 可选 smoke，打出 **PASS / FAIL / SKIP / WARN**，最后一行 `== Result: PASS|FAIL ==`。
+- **只有 FAIL 算没过闸**（exit 1）。缺 checker、没起服务、路径未配置 → SKIP，不挡未配好的项目。
+- 代码改了但 `docs/*.md` 没动 → 默认 WARN（`-SsotStrict` 才升为 FAIL）。
+- smoke 默认探测 `$BaseUrl`，不通就 SKIP；本地服务已起或要强制跑：`-Full` / `--full`。
+- **声称任务做完之前必须 `Result: PASS`**，不要用「我觉得过了」代替。
+
+## 6. 标准工作闭环
 
 ```
 定位现行逻辑（SSOT 落点 / rg / scan 的 Git hot files）
   → 只读命中文件（不要整仓、不要整份 _scan-raw）
-  → 对账(api-check 默认摘要) → 查状态(db)
-  → 按规范写码 → 自检(lint 命中文件) → 验证(smoke) → 更新 SSOT 触及的行
+  → 查状态(db) → 按规范写码
+  → 收尾跑 verify（唯一完成闸）→ 按 WARN/FAIL 回写 SSOT 或修代码
 ```
 
-**证明没猜错** = lint 绿 + smoke 通 + api-check Summary 与改动一致，而不是模型「觉得对」。
+**证明没猜错** = `verify` 的 Result 为 PASS，而不是模型「觉得对」。拆开查问题时仍用上面的 lint / smoke / api-check。

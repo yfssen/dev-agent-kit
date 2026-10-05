@@ -63,13 +63,21 @@ alwaysApply: true
 - 前端调用 ↔ 后端方法；**更新 SSOT 前先跑它**
 - 默认只打 Summary + 前 20 条错位（省 token）；全量加 `-All` / `ALL=1`
 
-## 5. 标准工作闭环
+## 5. 验收闸（完成的定义；改完必跑）
+
+```powershell
+./scripts/verify.ps1
+# Unix: ./scripts/verify.sh
+```
+
+串 lint（改动文件）+ api-check + SSOT 回写 + 可选 smoke。只有 FAIL 未过闸；缺依赖/没起服务是 SKIP。**声称做完之前必须 `Result: PASS`。**
+
+## 6. 标准工作闭环
 
 ```
 定位现行逻辑（SSOT 落点 / rg / scan 的 Git hot files）
   → 只读命中文件（不要整仓、不要整份 _scan-raw）
-  → 对账(api-check 默认摘要) → 查状态(db)
-  → 按规范写码 → 自检(lint 命中文件) → 验证(smoke) → 更新 SSOT 触及的行
+  → 查状态(db) → 按规范写码 → 收尾跑 verify（唯一完成闸）
 ```
 
-**证明没猜错** = lint 绿 + smoke 通 + api-check Summary 与改动一致，而不是模型「觉得对」。
+**证明没猜错** = `verify` Result 为 PASS，而不是模型「觉得对」。拆开查问题时仍用 lint / smoke / api-check。

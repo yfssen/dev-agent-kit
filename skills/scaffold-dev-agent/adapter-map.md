@@ -19,7 +19,7 @@ Install aliases: `workbuddy` and `codebuddy` are the same adapter.
 Same project may install several adapters. All must point at:
 
 - `AGENTS.md`
-- `scripts/db|lint|smoke|api-check` (`.ps1` / `.sh`)
+- `scripts/db|lint|smoke|api-check|verify` (`.ps1` / `.sh`)
 - `docs/项目进度与完成度.md` (SSOT)
 
 ## Adding a new tool

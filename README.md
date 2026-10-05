@@ -16,7 +16,7 @@
 
 一句话定位：**给项目装一个"长期记忆 + 真实双手"，把"读过文档的 AI 助手"升级成"能独立干活的开发智能体"。**
 
-本套件**不建代码库问答索引，也不自动记忆会话**。日常靠 SSOT 落点 + `rg` + `scan-project` 热文件摸到现行逻辑，只读命中文件；改完用 `lint` / `smoke` / `api-check`（默认摘要）证明没猜错。填 `AGENTS.md`、按技术栈适配 `scripts/`（约 30–60 分钟）——**分水岭不是「谁写的记忆」，而是「记忆能不能被代码复核」**；与实测冲突时以实测为准。
+本套件**不建代码库问答索引，也不自动记忆会话**。日常靠 SSOT 落点 + `rg` + `scan-project` 热文件摸到现行逻辑，只读命中文件；改完用 `verify`（一条命令串 lint / smoke / api-check / SSOT）证明没猜错。填 `AGENTS.md`、按技术栈适配 `scripts/`（约 30–60 分钟）——**分水岭不是「谁写的记忆」，而是「记忆能不能被代码复核」**；与实测冲突时以实测为准。
 
 ---
 
@@ -87,11 +87,12 @@ chmod +x install-global.sh && ./install-global.sh
 | 自检 | `lint.ps1` / `lint.sh` | `php -l` | `tsc --noEmit` / eslint | `ruff` / `mypy` |
 | 验证 | `smoke.ps1` / `smoke.sh` | 打 HTTP 接口 | vitest / supertest | pytest |
 | 对账 | `api-check.ps1` / `api-check.sh` | 前端 URL↔后端方法 | OpenAPI schema diff | 契约检查 |
+| **验收闸** | `verify.ps1` / `verify.sh` | 串起上面三项 + SSOT | 同左 | 同左 |
 
 另有 `mysql.ps1` / `mysql.sh`（交互或批准后的写库；写库须记入 `docs/数据库连接与复盘.md`）。
 
 ### 步骤 3 — 定闭环纪律
-在所用 adapter 的工具层入口里固化：`定位（SSOT / rg / 热文件）→ 只读命中文件 → 对账摘要 → 查状态 → 写码 → 自检 → 验证 → 更新 SSOT 触及的行`。不要把整仓或 `_scan-raw` 整份塞进对话。
+在所用 adapter 的工具层入口里固化：`定位（SSOT / rg / 热文件）→ 只读命中文件 → 查状态 → 写码 → 收尾跑 verify（唯一完成闸）`。不要把整仓或 `_scan-raw` 整份塞进对话。
 
 ### 步骤 4 — 治理
 1. 建 ignore（Cursor: `.cursorignore`），隔离历史/噪音目录。
@@ -164,6 +165,7 @@ dev-agent-kit/
       lint.ps1 / lint.sh             # 自检
       smoke.ps1 / smoke.sh           # 验证
       api-check.ps1 / api-check.sh   # 对账
+      verify.ps1 / verify.sh         # 验收闸（完成的定义）
     hooks/                           # 可选：Cursor 钩子护栏（见 hooks/README.md）
       README.md                      # 装什么 / 怎么适配 / 怎么验证
       cursor/hooks.json              # Windows（.ps1）

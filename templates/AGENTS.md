@@ -61,8 +61,9 @@
 | 语法/类型自检 | `./scripts/lint.ps1 <文件或目录>` | `./scripts/lint.sh <文件或目录>` |
 | 接口冒烟 | `./scripts/smoke.ps1` | `./scripts/smoke.sh` |
 | 接口错位对账 | `./scripts/api-check.ps1` | `./scripts/api-check.sh` |
+| **验收闸（完成的定义）** | `./scripts/verify.ps1` | `./scripts/verify.sh` |
 
-日常开发（省 token）：先读 SSOT 里该模块的落点 → `rg`/打开命中文件 → 改 → `lint` 这些文件 → `smoke`/`api-check`（默认摘要，全量加 `-All`）→ 只更新 SSOT 改到的行。不要把 `docs/_scan-raw.md` 整份贴进对话。
+日常开发（省 token）：先读 SSOT 里该模块的落点 → `rg`/打开命中文件 → 改 → **收尾跑 `verify`（PASS 才算做完）**。`verify` 会串 lint 改动文件 + api-check + SSOT 是否回写 + 可选 smoke；缺依赖/没起服务是 SKIP 不是 FAIL。不要把 `docs/_scan-raw.md` 整份贴进对话。对账全量加 `api-check -All`。
 
 ## 规范索引
 

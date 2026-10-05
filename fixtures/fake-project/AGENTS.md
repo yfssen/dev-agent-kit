@@ -27,3 +27,4 @@ Minimal PHP-shaped layout used only to exercise kit scripts.
 | lint | `./scripts/lint.ps1 <path>` | `./scripts/lint.sh <path>` |
 | smoke | `./scripts/smoke.ps1` | `./scripts/smoke.sh` |
 | reconcile | `./scripts/api-check.ps1` | `./scripts/api-check.sh` |
+| gate | `./scripts/verify.ps1` | `./scripts/verify.sh` |

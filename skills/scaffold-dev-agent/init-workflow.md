@@ -110,7 +110,7 @@ Fill:
 2. `AGENTS.md`（含双 git 或单前端、核心约束、DB 摘要指向复盘文档——含「跳过」状态）
 3. `docs/项目进度与完成度.md`
 4. Adapter progress stubs
-5. `# ADAPT` lint/smoke/api-check（无后端时路径可标 TODO/N/A）
+5. `# ADAPT` lint/smoke/api-check/verify（无后端时路径可标 TODO/N/A；verify 的扩展名与 lint 一致）
 
 Checklist:
 
@@ -124,7 +124,7 @@ Learn progress:
 - [ ] api-check once if feasible (else N/A)
 ```
 
-Daily after init: locate via SSOT / `rg` / scan Git hot files; read only the hits; prove with `lint` + `smoke` + `api-check` summary (`-All` / `ALL=1` for full). Do not paste whole `docs/_scan-raw.md`.
+Daily after init: locate via SSOT / `rg` / scan Git hot files; read only the hits; prove with `scripts/verify` (`Result: PASS`). Do not paste whole `docs/_scan-raw.md`.
 
 ## Step D — Tool-layer self-check（装完必查，别信「已安装」）
 

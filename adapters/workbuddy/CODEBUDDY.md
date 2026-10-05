@@ -26,13 +26,14 @@
 | 自检 | `./scripts/lint.ps1 <路径>` | `./scripts/lint.sh <路径>` |
 | 冒烟 | `./scripts/smoke.ps1` | `./scripts/smoke.sh` |
 | 对账 | `./scripts/api-check.ps1` | `./scripts/api-check.sh` |
+| **验收闸** | `./scripts/verify.ps1` | `./scripts/verify.sh` |
 
-缺依赖 → `exit 2`；业务/语法错 → `exit 1`。写库语句会被 `db` 脚本拦截。
+缺依赖 → `exit 2`；业务/语法错 → `exit 1`。写库语句会被 `db` 脚本拦截。声称做完前必跑 `verify`（只有 FAIL 未过闸；缺依赖/没起服务是 SKIP）。
 
 ## 闭环
 
 ```
-定位（SSOT / rg / scan hot files）→ 只读命中文件 → api-check 摘要 → db → 写码 → lint → smoke → 更新 SSOT 触及的行
+定位（SSOT / rg / scan hot files）→ 只读命中文件 → db → 写码 → 收尾跑 verify（唯一完成闸）
 ```
 
 不要把 `docs/_scan-raw.md` 整份贴进对话。`api-check` 默认摘要，全量加 `-All` / `ALL=1`。

@@ -50,7 +50,7 @@ Progress:
 - [ ] 3. Resolve MERGE (read → merge → delete *.kit-new)
 - [ ] 4. Project init/learn (REQUIRED unless user skips) — see init-workflow.md
 - [ ] 5. Adapt scripts (.env path, lint, smoke, api-check)
-- [ ] 6. Verify tools (db/mysql/lint/smoke/api-check as available)
+- [ ] 6. Verify tools (db/mysql/lint/smoke/api-check/verify as available)
 ```
 
 ### 1) Detect
@@ -102,7 +102,7 @@ Before merging line by line, classify each MERGE:
 
 ### 5–6) Adapt + verify
 
-`# ADAPT` lint/smoke/api-check paths; then spot-check tools.
+`# ADAPT` lint/smoke/api-check/verify paths; then spot-check tools (end with `scripts/verify`).
 **Also run [init-workflow.md](init-workflow.md) Step D** (BOM / path normalize / curl status / empty env Join-Path / PATHEXT / scan hot files actually printed) — install only copies files; it does not prove scripts work.
 
 ## Daily tools
@@ -112,15 +112,15 @@ Before merging line by line, classify each MERGE:
 | Scan | `./scripts/scan-project.ps1` | `./scripts/scan-project.sh` |
 | MySQL shell | `./scripts/mysql.ps1` | `./scripts/mysql.sh` |
 | Read-only SQL | `./scripts/db.ps1 "..."` | `./scripts/db.sh "..."` |
-| Lint / smoke / reconcile | `lint` / `smoke` / `api-check` | same |
+| Lint / smoke / reconcile / gate | `lint` / `smoke` / `api-check` / **`verify`** | same |
 
 ## Closed loop
 
 ```
-locate (SSOT + rg + scan hot files) → read hits only → api-check (summary) → db → code → lint → smoke → update SSOT rows touched
+locate (SSOT + rg + scan hot files) → read hits only → db → code → run verify (definition of done)
 ```
 
-Do not dump `_scan-raw.md` or whole trees into the reply. Default `api-check` already truncates mismatch lists (`-All` / `ALL=1` for full).
+Do not dump `_scan-raw.md` or whole trees into the reply. Claim done only when `verify` prints `Result: PASS`. Default `api-check` already truncates mismatch lists (`-All` / `ALL=1` for full).
 
 ## Non-goals
 
