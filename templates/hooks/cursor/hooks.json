@@ -16,12 +16,6 @@
       {
         "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/backup-ssot.ps1"
       }
-    ],
-    "stop": [
-      {
-        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/ssot-reminder.ps1",
-        "loop_limit": 1
-      }
     ]
   }
 }

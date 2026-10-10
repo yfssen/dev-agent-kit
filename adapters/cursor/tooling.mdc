@@ -70,7 +70,8 @@ alwaysApply: true
 # Unix: ./scripts/verify.sh
 ```
 
-串 lint（改动文件）+ api-check + SSOT 回写 + 可选 smoke。只有 FAIL 未过闸；缺依赖/没起服务是 SKIP。**声称做完之前必须 `Result: PASS`。**
+串 lint（工作区内所有 git 仓的改动）+ api-check + SSOT 回写 + 可选 smoke。只有 FAIL 未过闸；缺依赖/没起服务是 SKIP。**声称做完之前必须 `Result: PASS`。**
+SSOT = 工作区根 `docs/*.md`（同目录多 git 时不在子仓内）。扩展名与子仓扫描见 `scripts/kit-layout`。**多仓项目不 ADAPT reminder = 假自动维护。** **改代码必须写 SSOT。**
 
 ## 6. 标准工作闭环
 

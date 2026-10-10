@@ -22,6 +22,18 @@ if (-not [System.IO.Path]::IsPathRooted($Target)) {
     $fullTarget = Join-Path $root $Target
 }
 
+if (-not (Test-Path $fullTarget)) { Write-Error "Target not found: $Target"; exit 2 }
+
+# Skip before resolving the checker: .vue/.js count as "code" for SSOT, but php -l cannot parse them.
+$checkExts = @('.php')   # ADAPT: extensions this checker can actually parse
+if (-not (Test-Path $fullTarget -PathType Container)) {
+    $got = [System.IO.Path]::GetExtension($fullTarget).ToLower()
+    if ($checkExts -notcontains $got) {
+        Write-Host ("OK: skip (not a lint target): " + $Target)
+        exit 0
+    }
+}
+
 # --- Resolve checker (example: PHP CLI) ---   # ADAPT
 $php = $null
 if ($env:LZ_PHP -and (Test-Path $env:LZ_PHP)) {
@@ -33,8 +45,6 @@ if (-not $php) {
     Write-Error "checker not found. Set `$env:LZ_PHP or add it to PATH. (NOT a syntax error.)"
     exit 2
 }
-
-if (-not (Test-Path $fullTarget)) { Write-Error "Target not found: $Target"; exit 2 }
 
 if (Test-Path $fullTarget -PathType Container) {
     $files = @(Get-ChildItem $fullTarget -Recurse -Filter *.php -File)   # ADAPT extension

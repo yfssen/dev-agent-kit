@@ -4,8 +4,11 @@
 # Each sub-check is PASS / FAIL / SKIP / WARN. Only FAIL fails the gate (exit 1).
 # Missing script / missing checker / unconfigured paths -> SKIP (not FAIL), so an
 # unconfigured project still runs cleanly. Encoding: ASCII-only (no BOM).
-# ADAPT: $exts (changed-code detection) and $BaseUrl (smoke passthrough).
+# ADAPT: $exts, $BaseUrl, and $ProbePath (must match smoke.ps1's first public endpoint).
 # Usage: ./scripts/verify.ps1 [-Target <path>] [-Full] [-BaseUrl <url>] [-SsotStrict]
+# Smoke probe: GET $BaseUrl$ProbePath. Only run smoke if the body looks like this
+# project's API JSON ("code"). A random HTTP service on the same port (phpstudy,
+# nginx default site, ...) is SKIP, not FAIL -- otherwise the done-gate wedges.
 
 param(
     [string]$Target,                                 # lint this path instead of git-changed files
@@ -15,7 +18,10 @@ param(
 )
 
 $root = Split-Path $PSScriptRoot -Parent
-$exts = @('.php')   # ADAPT
+$ProbePath = "/api/website/info"   # ADAPT: keep in sync with smoke.ps1 first public endpoint
+$layout = Join-Path $PSScriptRoot 'kit-layout.ps1'
+if (Test-Path $layout) { . $layout }
+# Code extensions and multi-git discovery live in kit-layout.ps1 ($KitCodeExts).
 
 $script:passN = 0; $script:failN = 0; $script:skipN = 0; $script:warnN = 0
 $script:lines = New-Object System.Collections.Generic.List[string]
@@ -37,31 +43,17 @@ function Get-AbsPath([string]$rel) {
     return [IO.Path]::GetFullPath((Join-Path $root $norm))
 }
 
-function Get-PorcelainRel {
-    $list = New-Object System.Collections.Generic.List[string]
-    foreach ($l in @(& git -C $root status --porcelain 2>$null)) {
-        if ($null -eq $l) { continue }
-        $s = [string]$l
-        if ($s.Length -lt 4) { continue }
-        $p = $s.Substring(3).Trim()
-        if ($p -match ' -> ') { $p = ($p -split ' -> ')[-1] }
-        $p = $p.Trim('"')
-        if ($p) { [void]$list.Add($p) }
-    }
-    return $list
-}
-
-# --- Collect changed code files (git working tree + staged) ---
+# --- Collect changed code files (all git repos in the workspace) ---
 $changed = New-Object System.Collections.Generic.List[string]
-& git -C $root rev-parse --is-inside-work-tree 2>$null | Out-Null
-$inGit = ($LASTEXITCODE -eq 0)
+$repos = @()
+if (Get-Command Get-KitGitRepos -ErrorAction SilentlyContinue) {
+    $repos = @(Get-KitGitRepos $root)
+}
+$inGit = ($repos.Count -gt 0)
 if ($Target) {
     [void]$changed.Add($Target)
 } elseif ($inGit) {
-    foreach ($p in (Get-PorcelainRel)) {
-        $ext = [IO.Path]::GetExtension($p).ToLower()
-        if ($exts -contains $ext) { [void]$changed.Add($p) }
-    }
+    foreach ($p in (Get-KitChangedCode $root)) { [void]$changed.Add($p) }
 }
 
 # --- 1) lint changed files ---
@@ -106,39 +98,56 @@ if (-not (Test-Path $apiScript)) {
     }
 }
 
-# --- 3) SSOT freshness (code changed but docs/*.md untouched) ---
+# --- 3) SSOT freshness: workspace-root docs/*.md (mtime or root git), not child-repo docs ---
 if ($inGit) {
-    $docsTouched = $false; $codeChanged = $false
-    foreach ($p in (Get-PorcelainRel)) {
-        $norm = $p -replace '\\', '/'
-        if ($norm -match '^docs/[^/]+\.md$') { $docsTouched = $true; continue }
-        $ext = [IO.Path]::GetExtension($norm).ToLower()
-        if ($exts -contains $ext) { $codeChanged = $true }
-    }
-    if (-not $codeChanged) { Res 'SKIP' 'ssot' 'no code change in working tree' }
-    elseif ($docsTouched) { Res 'PASS' 'ssot' 'SSOT updated alongside code' }
-    elseif ($SsotStrict) { Res 'FAIL' 'ssot' 'code changed but docs/*.md (SSOT) not updated' }
-    else { Res 'WARN' 'ssot' 'code changed but docs/*.md (SSOT) not updated' }
+    $codeRels = @($changed)
+    if ($codeRels.Count -eq 0) { Res 'SKIP' 'ssot' 'no code change in any git repo' }
+    elseif (Test-KitSsotFresh $root $codeRels) { Res 'PASS' 'ssot' 'workspace-root docs/*.md looks updated' }
+    elseif ($SsotStrict) { Res 'FAIL' 'ssot' 'code changed but workspace-root docs/*.md (SSOT) not updated' }
+    else { Res 'WARN' 'ssot' 'code changed but workspace-root docs/*.md (SSOT) not updated' }
 } else {
-    Res 'SKIP' 'ssot' 'not a git work tree'
+    Res 'SKIP' 'ssot' 'no git repo at workspace root or immediate children'
 }
 
-# --- 4) smoke (optional; needs a running server) ---
+# --- 4) smoke (optional; needs THIS project's server, not "any HTTP on the port") ---
+function Get-ProbeKind {
+    # Same client family as smoke.ps1 (Invoke-*). Do not use HEAD / empty-proxy
+    # HttpWebRequest -- those disagree with Invoke-RestMethod on local php -S.
+    $url = $BaseUrl.TrimEnd('/') + $ProbePath
+    $body = $null
+    try {
+        $resp = Invoke-WebRequest -Uri $url -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+        $body = [string]$resp.Content
+    } catch {
+        $r = $_.Exception.Response
+        if (-not $r) { return 'none' }
+        try {
+            $stream = $r.GetResponseStream()
+            if ($stream) {
+                $reader = New-Object System.IO.StreamReader($stream)
+                $body = $reader.ReadToEnd()
+            }
+        } catch { $body = '' }
+        if ([string]::IsNullOrEmpty($body)) { return 'other' }
+    }
+    if ($body -match '"code"') { return 'ours' }
+    return 'other'
+}
+
 $smokeScript = Join-Path $PSScriptRoot 'smoke.ps1'
 if (-not (Test-Path $smokeScript)) {
     Res 'SKIP' 'smoke' 'scripts/smoke.ps1 missing'
 } else {
-    $reachable = $false
-    try {
-        $req = [System.Net.WebRequest]::Create($BaseUrl)
-        $req.Timeout = 2000; $req.Method = 'HEAD'
-        $resp = $req.GetResponse(); $resp.Close(); $reachable = $true
-    } catch {
-        if ($_.Exception.Response) { $reachable = $true }   # HTTP error still means server is up
-    }
-    if (-not $reachable -and -not $Full) {
-        Res 'SKIP' 'smoke' "server not reachable at $BaseUrl (use -Full to force)"
+    $kind = Get-ProbeKind
+    $runSmoke = $false
+    if ($Full) { $runSmoke = $true }
+    elseif ($kind -eq 'ours') { $runSmoke = $true }
+    elseif ($kind -eq 'other') {
+        Res 'SKIP' 'smoke' "other HTTP service at $BaseUrl (not this API; use -Full to force)"
     } else {
+        Res 'SKIP' 'smoke' "server not reachable at $BaseUrl (use -Full to force)"
+    }
+    if ($runSmoke) {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $smokeScript -BaseUrl $BaseUrl 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) { Res 'PASS' 'smoke' 'endpoints alive' }
         else { Res 'FAIL' 'smoke' 'endpoint failures; run scripts/smoke.ps1' }

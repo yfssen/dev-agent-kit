@@ -21,12 +21,13 @@ if (-not $path -and $j.tool_input) {
     }
 }
 if (-not $path) {
-    $m = [regex]::Match($raw, '[A-Za-z]:\\[^"]+?\.php|/[^"]+?\.php')
+    $m = [regex]::Match($raw, '[A-Za-z]:\\[^"]+?\.(php|vue|js|ts|sql)|/[^"]+?\.(php|vue|js|ts|sql)')
     if ($m.Success) { $path = $m.Value }
 }
 if (-not $path) { exit 0 }
 
-$exts = @('.php')   # ADAPT
+# ADAPT: files to consider. lint.ps1 skips extensions it cannot parse (default .php only).
+$exts = @('.php', '.vue', '.js', '.ts', '.sql')
 $ext = [System.IO.Path]::GetExtension($path).ToLower()
 if ($exts -notcontains $ext) { exit 0 }
 

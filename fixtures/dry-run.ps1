@@ -68,7 +68,9 @@ try {
 
   $must = @(
     "scripts\db.ps1", "scripts\lint.ps1", "scripts\smoke.ps1", "scripts\api-check.ps1", "scripts\verify.ps1",
+    "scripts\kit-layout.ps1",
     "scripts\db.sh", "scripts\lint.sh", "scripts\smoke.sh", "scripts\api-check.sh", "scripts\verify.sh",
+    "scripts\kit-layout.sh",
     "scripts\mysql.ps1", "scripts\mysql.sh",
     "scripts\scan-project.ps1", "scripts\scan-project.sh",
     "scripts\apply-mysql-dsn.ps1", "scripts\apply-mysql-dsn.sh",
@@ -167,6 +169,83 @@ try {
       Write-Host "[WARN] git not available; verify lint/ssot git cases skipped" -ForegroundColor Yellow
     }
 
+    $nudgePs = Join-Path $KitRoot "templates\hooks\cursor\hooks\ssot-reminder.ps1"
+    $nudgeSh = Join-Path $KitRoot "templates\hooks\cursor\hooks\ssot-reminder.sh"
+    $nudgePsText = Get-Content $nudgePs -Raw
+    $nudgeShText = Get-Content $nudgeSh -Raw
+    if ($nudgePsText -notmatch 'followup_message\s*=') { Ok "ssot-reminder.ps1 does not auto-send a chat turn" } else { Bad "ssot-reminder.ps1 must not emit followup_message" }
+    if ($nudgeShText -notmatch '"followup_message"') { Ok "ssot-reminder.sh does not auto-send a chat turn" } else { Bad "ssot-reminder.sh must not emit followup_message" }
+    $hooksJson = Get-Content (Join-Path $KitRoot "templates\hooks\cursor\hooks.json") -Raw
+    if ($hooksJson -notmatch 'ssot-reminder') { Ok "hooks.json has no stop ssot-reminder" } else { Bad "hooks.json must not register ssot-reminder" }
+
+    # Same-folder multi-git: no root .git; SSOT at workspace-root docs/; .vue counts as code.
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+      $mg = Join-Path $env:TEMP ("dak-multigit-" + [guid]::NewGuid().ToString("n"))
+      try {
+        New-Item -ItemType Directory -Force $mg,
+          (Join-Path $mg "docs"),
+          (Join-Path $mg "admin"),
+          (Join-Path $mg "pc_web"),
+          (Join-Path $mg "scripts") | Out-Null
+        Copy-Item (Join-Path $KitRoot "templates\scripts\kit-layout.ps1") (Join-Path $mg "scripts\kit-layout.ps1") -Force
+        Copy-Item (Join-Path $KitRoot "templates\scripts\lint.ps1") (Join-Path $mg "scripts\lint.ps1") -Force
+        Copy-Item (Join-Path $KitRoot "templates\scripts\verify.ps1") (Join-Path $mg "scripts\verify.ps1") -Force
+        Set-Content -Path (Join-Path $mg "docs\progress.md") -Value "ssot" -Encoding ascii
+
+        Push-Location (Join-Path $mg "admin")
+        try {
+          & git init -q
+          Set-Content -Path "x.php" -Value "<?php echo 1;" -Encoding ascii
+          & git -c user.email=kit@example.com -c user.name=kit add -A
+          & git -c user.email=kit@example.com -c user.name=kit commit -qm init
+          Add-Content -Path "x.php" -Value "`n// edit" -Encoding ascii
+        } finally { Pop-Location }
+
+        Push-Location (Join-Path $mg "pc_web")
+        try {
+          & git init -q
+          Set-Content -Path "a.vue" -Value "<template></template>" -Encoding ascii
+          & git -c user.email=kit@example.com -c user.name=kit add -A
+          & git -c user.email=kit@example.com -c user.name=kit commit -qm init
+          Add-Content -Path "a.vue" -Value "`n<!-- edit -->" -Encoding ascii
+        } finally { Pop-Location }
+
+        $ssotItem = Get-Item (Join-Path $mg "docs\progress.md")
+        $ssotItem.LastWriteTimeUtc = [datetime]::UtcNow.AddMinutes(-10)
+
+        . (Join-Path $mg "scripts\kit-layout.ps1")
+        $mgRepos = @(Get-KitGitRepos $mg)
+        if ($mgRepos.Count -ge 2) { Ok "multi-git discovers child repos ($($mgRepos.Count))" } else { Bad "multi-git should find admin + pc_web, got $($mgRepos.Count)" }
+        $mgRootGit = Test-Path (Join-Path $mg ".git")
+        if (-not $mgRootGit) { Ok "multi-git workspace root has no .git" } else { Bad "multi-git fixture root should not be a git repo" }
+
+        $mgCode = @(Get-KitChangedCode $mg)
+        $mgJoined = ($mgCode -join '|')
+        if ($mgJoined -match 'admin/.+\.php' -and $mgJoined -match 'pc_web/.+\.vue') {
+          Ok "multi-git changed code includes php and vue"
+        } else {
+          Bad "multi-git changed code should include admin php + pc_web vue, got: $mgJoined"
+        }
+        if (-not (Test-KitSsotFresh $mg $mgCode)) { Ok "root docs mtime SSOT stale" } else { Bad "SSOT should be stale when child code is newer than root docs" }
+
+        Push-Location $mg
+        try {
+          $mgVerify = @(& .\scripts\verify.ps1 2>&1 | ForEach-Object { "$_" })
+          $mgVerify | ForEach-Object { Write-Host $_ }
+          $mgV = $mgVerify -join "`n"
+          if ($mgV -match '\[WARN\] ssot') { Ok "verify WARNs stale SSOT on multi-git" } else { Bad "verify should WARN ssot when child code dirty and root docs not updated" }
+        } finally { Pop-Location }
+
+        (Get-Item (Join-Path $mg "docs\progress.md")).LastWriteTimeUtc = [datetime]::UtcNow
+        if (Test-KitSsotFresh $mg $mgCode) { Ok "root docs mtime SSOT fresh" } else { Bad "SSOT should be fresh after touching workspace-root docs/*.md" }
+
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $mg "scripts\lint.ps1") (Join-Path $mg "pc_web\a.vue") | Out-Null
+        if ($LASTEXITCODE -eq 0) { Ok "lint skips .vue (not php -l)" } else { Bad "lint .vue should skip exit 0, got $LASTEXITCODE" }
+      } finally {
+        if (Test-Path $mg) { Remove-Item $mg -Recurse -Force -ErrorAction SilentlyContinue }
+      }
+    }
+
     # --- smoke ---
     if ($php) {
       $port = 18080
@@ -178,6 +257,10 @@ try {
         Start-Sleep -Milliseconds 600
         & .\scripts\smoke.ps1 -BaseUrl "http://127.0.0.1:$port" | Out-Host
         if ($LASTEXITCODE -eq 0) { Ok "smoke PASS against mock server" } else { Bad "smoke expected exit 0, got $LASTEXITCODE" }
+
+        $vSmoke = @(& .\scripts\verify.ps1 -BaseUrl "http://127.0.0.1:$port" 2>&1 | ForEach-Object { "$_" })
+        $vSmoke | ForEach-Object { Write-Host $_ }
+        if (($vSmoke -join "`n") -match '\[PASS\] smoke') { Ok "verify PASS smoke against this project's mock API" } else { Bad "verify should PASS smoke when probe hits our API" }
       }
       finally {
         if ($mockProc -and -not $mockProc.HasExited) {
@@ -208,11 +291,13 @@ try {
       Bad "install.sh missing"
     } else {
       $installShText = Get-Content $installSh -Raw
-      if ($installShText -match '\.kit-new' -and $installShText -match 'exit 2') {
-        Ok "install.sh source has merge-safe (.kit-new + exit 2)"
+      if ($installShText -match '\.kit-new' -and $installShText -match 'exit 2' -and $installShText -match 'MERGE GUIDE') {
+        Ok "install.sh source has merge-safe (.kit-new + exit 2 + MERGE GUIDE)"
       } else {
-        Bad "install.sh missing merge-safe markers (.kit-new / exit 2)"
+        Bad "install.sh missing merge-safe markers (.kit-new / exit 2 / MERGE GUIDE)"
       }
+      $installPsText = Get-Content $install -Raw
+      if ($installPsText -match 'MERGE GUIDE') { Ok "install.ps1 source has MERGE GUIDE" } else { Bad "install.ps1 missing MERGE GUIDE" }
     }
     & $install -KitRoot $KitRoot -ProjectRoot $work -Adapters "cursor,claude" 2>&1 | Out-Host
     if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {
@@ -249,6 +334,55 @@ try {
       if ($LASTEXITCODE -eq 1) { Ok "db.sh blocks multi-statement" } else { Bad "db.sh multi-statement expected exit 1, got $LASTEXITCODE" }
       & $gitBash $dbSh "SELECT 1\gDROP TABLE users" 2>$null | Out-Null
       if ($LASTEXITCODE -eq 1) { Ok "db.sh blocks \\g" } else { Bad "db.sh \\g expected exit 1, got $LASTEXITCODE" }
+
+      $klSh = Join-Path $KitRoot "templates\scripts\kit-layout.sh"
+      if (Test-Path $klSh) {
+        $tmpKl = Join-Path $work "_kit-layout.sh"
+        $lfKl = ([IO.File]::ReadAllText($klSh) -replace "`r`n", "`n" -replace "`r", "`n")
+        [IO.File]::WriteAllText($tmpKl, $lfKl, (New-Object System.Text.UTF8Encoding $false))
+        & $gitBash -n $tmpKl 2>$null
+        if ($LASTEXITCODE -eq 0) { Ok "kit-layout.sh bash -n syntax OK" } else { Bad "kit-layout.sh bash -n failed exit=$LASTEXITCODE" }
+      } else {
+        Bad "templates/scripts/kit-layout.sh missing"
+      }
+
+      $verifySh = Join-Path (Get-Location) "scripts\verify.sh"
+      if (Test-Path $verifySh) {
+        $lfV = ([IO.File]::ReadAllText($verifySh) -replace "`r`n", "`n" -replace "`r", "`n")
+        [IO.File]::WriteAllText($verifySh, $lfV, (New-Object System.Text.UTF8Encoding $false))
+        & $gitBash -n $verifySh 2>$null
+        if ($LASTEXITCODE -eq 0) { Ok "verify.sh bash -n syntax OK" } else { Bad "verify.sh bash -n failed exit=$LASTEXITCODE" }
+        # Dead port: must SKIP smoke even if localhost:8080 is occupied by another stack.
+        $vShOut = & $gitBash $verifySh --base-url "http://127.0.0.1:1" 2>&1 | ForEach-Object { "$_" }
+        $vShOut | ForEach-Object { Write-Host $_ }
+        $vShText = $vShOut -join "`n"
+        if ($vShText -match '== Result:') { Ok "verify.sh prints Result line" } else { Bad "verify.sh should print == Result:" }
+        if ($vShText -match '\[SKIP\] smoke') { Ok "verify.sh skips smoke on dead port" } else { Bad "verify.sh should SKIP smoke when probe cannot connect" }
+      } else {
+        Bad "scripts/verify.sh missing in workdir"
+      }
+
+      $hookDir = Join-Path $KitRoot "templates\hooks\cursor\hooks"
+      if (Test-Path $hookDir) {
+        $hookShN = 0; $hookShBad = 0
+        foreach ($hf in Get-ChildItem $hookDir -Filter *.sh -File) {
+          $tmpH = Join-Path $work ("_" + $hf.Name)
+          $lfH = ([IO.File]::ReadAllText($hf.FullName) -replace "`r`n", "`n" -replace "`r", "`n")
+          [IO.File]::WriteAllText($tmpH, $lfH, (New-Object System.Text.UTF8Encoding $false))
+          & $gitBash -n $tmpH 2>$null
+          if ($LASTEXITCODE -eq 0) { $hookShN++ } else { $hookShBad++; Bad "hook $($hf.Name) bash -n failed" }
+        }
+        if ($hookShBad -eq 0 -and $hookShN -gt 0) { Ok "hooks *.sh bash -n OK ($hookShN files)" }
+        $hookPsN = 0; $hookPsBad = 0
+        foreach ($hf in Get-ChildItem $hookDir -Filter *.ps1 -File) {
+          $parseErr = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($hf.FullName, [ref]$null, [ref]$parseErr)
+          if ($parseErr -and $parseErr.Count -gt 0) { $hookPsBad++; Bad "hook $($hf.Name) parse error" } else { $hookPsN++ }
+        }
+        if ($hookPsBad -eq 0 -and $hookPsN -gt 0) { Ok "hooks *.ps1 parse OK ($hookPsN files)" }
+      } else {
+        Bad "templates/hooks/cursor/hooks missing"
+      }
 
       if (Test-Path $installSh) {
         $tmpInstall = Join-Path $work "_install.sh"

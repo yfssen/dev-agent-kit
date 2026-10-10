@@ -11,11 +11,12 @@ path=""
 if command -v jq >/dev/null 2>&1; then
   path="$(printf '%s' "$raw" | jq -r '.file_path // .path // .filePath // .tool_input.file_path // .tool_input.path // empty' 2>/dev/null)"
 fi
-[ -z "$path" ] && path="$(printf '%s' "$raw" | grep -oE '/[^"]+\.php' | head -n1)"
+[ -z "$path" ] && path="$(printf '%s' "$raw" | grep -oE '/[^"]+\.(php|vue|js|ts|sql)' | head -n1)"
 [ -z "$path" ] && exit 0
 
+# ADAPT: files to consider. lint.sh skips extensions it cannot parse (default .php only).
 case "$path" in
-  *.php) : ;;   # ADAPT extensions
+  *.php|*.vue|*.js|*.ts|*.sql) : ;;
   *) exit 0 ;;
 esac
 

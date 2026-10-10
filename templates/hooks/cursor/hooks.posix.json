@@ -16,12 +16,6 @@
       {
         "command": "bash .cursor/hooks/backup-ssot.sh"
       }
-    ],
-    "stop": [
-      {
-        "command": "bash .cursor/hooks/ssot-reminder.sh",
-        "loop_limit": 1
-      }
     ]
   }
 }

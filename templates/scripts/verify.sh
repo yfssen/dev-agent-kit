@@ -5,8 +5,10 @@
 # Each sub-check is PASS / FAIL / SKIP / WARN. Only FAIL fails the gate (exit 1).
 # Missing script / missing checker / unconfigured paths -> SKIP (not FAIL).
 # Encoding: ASCII-only (no BOM).
-# ADAPT: the code-extension test and BASE_URL (smoke passthrough).
+# ADAPT: the code-extension test, BASE_URL, and PROBE_PATH (must match smoke.sh).
 # Usage: ./scripts/verify.sh [--target <path>] [--full] [--base-url <url>] [--ssot-strict]
+# Smoke probe: GET BASE_URL+PROBE_PATH. Only run smoke if the body looks like this
+# project's API JSON ("code"). A random HTTP service on the same port is SKIP.
 set +e
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -15,6 +17,7 @@ ROOT="$(cd "$HERE/.." && pwd)"
 TARGET=""
 FULL=0
 BASE_URL="http://localhost:8080"   # ADAPT
+PROBE_PATH="/api/website/info"     # ADAPT: keep in sync with smoke.sh first public endpoint
 SSOT_STRICT=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -41,27 +44,21 @@ res() { # tag name detail
 [$1] $2$d"
 }
 
-is_code() { case "$1" in *.php) return 0 ;; *) return 1 ;; esac }   # ADAPT
+# shellcheck disable=SC1091
+if [ -f "$HERE/kit-layout.sh" ]; then
+  . "$HERE/kit-layout.sh"
+fi
 
-# --- Collect changed code files ---
+# --- Collect changed code files (all git repos in the workspace) ---
 in_git=0
-if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  in_git=1
+if command -v git >/dev/null 2>&1 && command -v kit_git_repos >/dev/null 2>&1; then
+  if [ -n "$(kit_git_repos "$ROOT")" ]; then in_git=1; fi
 fi
 changed=""
 if [ -n "$TARGET" ]; then
   changed="$TARGET"
 elif [ "$in_git" = "1" ]; then
-  while IFS= read -r l; do
-    [ ${#l} -ge 4 ] || continue
-    p="${l:3}"
-    case "$p" in *" -> "*) p="${p##* -> }" ;; esac
-    p="${p%\"}"; p="${p#\"}"
-    if is_code "$p"; then changed="$changed
-$p"; fi
-  done <<EOF
-$(git -C "$ROOT" status --porcelain 2>/dev/null)
-EOF
+  changed="$(kit_changed_code "$ROOT")"
 fi
 
 # --- 1) lint changed files ---
@@ -112,46 +109,64 @@ else
   fi
 fi
 
-# --- 3) SSOT freshness ---
+# --- 3) SSOT freshness: workspace-root docs/*.md (mtime or root git) ---
 if [ "$in_git" = "1" ]; then
-  docs_touched=0; code_changed=0
-  while IFS= read -r l; do
-    [ ${#l} -ge 4 ] || continue
-    p="${l:3}"
-    case "$p" in *" -> "*) p="${p##* -> }" ;; esac
-    p="${p%\"}"; p="${p#\"}"
-    case "$p" in
-      docs/*/*) ;;
-      docs/*.md) docs_touched=1; continue ;;
-    esac
-    if is_code "$p"; then code_changed=1; fi
-  done <<EOF
-$(git -C "$ROOT" status --porcelain 2>/dev/null)
-EOF
-  if [ "$code_changed" = "0" ]; then
-    res SKIP ssot "no code change in working tree"
-  elif [ "$docs_touched" = "1" ]; then
-    res PASS ssot "SSOT updated alongside code"
-  elif [ "$SSOT_STRICT" = "1" ]; then
-    res FAIL ssot "code changed but docs/*.md (SSOT) not updated"
+  if [ -z "$(printf '%s' "$changed" | tr -d '[:space:]')" ]; then
+    res SKIP ssot "no code change in any git repo"
   else
-    res WARN ssot "code changed but docs/*.md (SSOT) not updated"
+    set --
+    while IFS= read -r _p; do
+      [ -n "$_p" ] || continue
+      set -- "$@" "$_p"
+    done <<EOF
+$changed
+EOF
+    if kit_ssot_fresh "$ROOT" "$@"; then
+      res PASS ssot "workspace-root docs/*.md looks updated"
+    elif [ "$SSOT_STRICT" = "1" ]; then
+      res FAIL ssot "code changed but workspace-root docs/*.md (SSOT) not updated"
+    else
+      res WARN ssot "code changed but workspace-root docs/*.md (SSOT) not updated"
+    fi
   fi
 else
-  res SKIP ssot "not a git work tree"
+  res SKIP ssot "no git repo at workspace root or immediate children"
 fi
 
-# --- 4) smoke (optional; needs a running server) ---
+# --- 4) smoke (optional; needs THIS project's server, not "any HTTP on the port") ---
+probe_kind() {
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '%s' "none"
+    return
+  fi
+  url="${BASE_URL%/}${PROBE_PATH}"
+  body=$(curl -sS --noproxy '*' --max-time 2 "$url" 2>/dev/null)
+  if [ $? -ne 0 ]; then
+    printf '%s' "none"
+    return
+  fi
+  if printf '%s' "$body" | grep -q '"code"'; then
+    printf '%s' "ours"
+  else
+    printf '%s' "other"
+  fi
+}
+
 if [ ! -f "$HERE/smoke.sh" ]; then
   res SKIP smoke "scripts/smoke.sh missing"
 else
-  reachable=0
-  if command -v curl >/dev/null 2>&1; then
-    curl -s -o /dev/null --max-time 2 "$BASE_URL" && reachable=1
-  fi
-  if [ "$reachable" = "0" ] && [ "$FULL" = "0" ]; then
-    res SKIP smoke "server not reachable at $BASE_URL (use --full to force)"
+  kind="$(probe_kind)"
+  run_smoke=0
+  if [ "$FULL" = "1" ]; then
+    run_smoke=1
+  elif [ "$kind" = "ours" ]; then
+    run_smoke=1
+  elif [ "$kind" = "other" ]; then
+    res SKIP smoke "other HTTP service at $BASE_URL (not this API; use --full to force)"
   else
+    res SKIP smoke "server not reachable at $BASE_URL (use --full to force)"
+  fi
+  if [ "$run_smoke" = "1" ]; then
     bash "$HERE/smoke.sh" --base-url "$BASE_URL" >/dev/null 2>&1
     if [ $? -eq 0 ]; then res PASS smoke "endpoints alive"; else res FAIL smoke "endpoint failures; run scripts/smoke.sh"; fi
   fi

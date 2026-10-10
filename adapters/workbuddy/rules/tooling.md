@@ -29,3 +29,4 @@ ADAPT 陷阱：相对路径先按工作区根解析再 `cd` 子目录；`curl �
 ```
 
 不要把 `docs/_scan-raw.md` 整份贴进对话。`api-check` 默认摘要，全量加 `-All` / `ALL=1`。
+SSOT = 工作区根 `docs/*.md`；多 git 扫一级子目录 `.git`（`scripts/kit-layout`）。**多仓不 ADAPT reminder = 假自动维护。改代码必须写 SSOT。**

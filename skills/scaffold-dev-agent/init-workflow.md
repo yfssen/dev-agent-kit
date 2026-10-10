@@ -34,6 +34,8 @@ Frontend-only (common early stage):
 2. Record each side path + own `.git` yes/no. If no backend: record「暂无后端 / 无库」.
 3. Commit in the repo you changed.
 4. Point `db`/`mysql`/`apply-mysql-dsn` `# ADAPT` `.env` to backend `.env` when dual-git.
+5. SSOT is always **workspace-root** `docs/*.md`, even when child dirs (`admin/`, `pc_web/`, …) each have their own `.git`. Do not assume docs live inside the only git repo.
+6. ADAPT `scripts/kit-layout.ps1` / `kit-layout.sh` (`$KitCodeExts` / `KIT_CODE_EXT`, optional `$KitRepoNames`). **Multi-git projects that skip this ADAPT have fake auto-maintenance**: root often has no `.git`, so an unadapted reminder `git status`s the root, exits 0, and never nudges.
 
 ## Step A — Structural scan
 
@@ -109,8 +111,8 @@ Fill:
 1. `docs/项目结构与架构.md`（含「仅前端 / 无后端」若适用）
 2. `AGENTS.md`（含双 git 或单前端、核心约束、DB 摘要指向复盘文档——含「跳过」状态）
 3. `docs/项目进度与完成度.md`
-4. Adapter progress stubs
-5. `# ADAPT` lint/smoke/api-check/verify（无后端时路径可标 TODO/N/A；verify 的扩展名与 lint 一致）
+4. Adapter `project-progress` **快照必填**：把 `YYYY-MM-DD` / `<一句话>` / `<需求文档路径>` 换成项目事实。留下占位符 = 未完成 init（模型谈进度读到空壳）。写清「**改代码必须写 SSOT**」。
+5. `# ADAPT` `scripts/kit-layout`（多 git 扫描 + 代码扩展名：PHP+Vue 至少 php/vue/js/ts/sql）+ lint/smoke/api-check/verify（无后端时路径可标 TODO/N/A；lint 的 checker 扩展名可以比 kit-layout 窄——`.vue` 算代码会 nudge，但默认 `php -l` 会 skip 而不是误解析）
 
 Checklist:
 
@@ -118,7 +120,9 @@ Checklist:
 Learn progress:
 - [ ] Asked user for MySQL (or user said 无库 → 复盘 marked 跳过)
 - [ ] SELECT 1 ok / FAIL recorded / N/A (无库)
-- [ ] Repo layout (single / dual-git / frontend-only)
+- [ ] Repo layout (single / dual-git / same-folder multi-git / frontend-only)
+- [ ] project-progress snapshot filled (no YYYY-MM-DD leftover)
+- [ ] kit-layout ADAPT'd (child .git + code exts) OR confirmed single-repo PHP default is correct
 - [ ] Backend / frontend stack + CRUD conventions (or 后端待建)
 - [ ] 二开约束 + UTF-8 / no BOM / no emoji in comments
 - [ ] api-check once if feasible (else N/A)
@@ -156,6 +160,8 @@ Daily after init: locate via SSOT / `rg` / scan Git hot files; read only the hit
 
 - [ ] User was asked for MySQL; either `.env` written + 复盘 filled, **or** 复盘 marked 跳过（无库）
 - [ ] `docs/项目结构与架构.md` + `AGENTS.md` + SSOT seeded
+- [ ] Adapter `project-progress` 快照已填（无 `YYYY-MM-DD` / `<一句话>` 占位）；写清「改代码必须写 SSOT」
+- [ ] `kit-layout` 已按多仓/栈 ADAPT（或确认单仓 PHP 默认即可）。多仓项目不 ADAPT reminder = 假自动维护
 - [ ] If has DB: `db`/`mysql` `.env` path correct; if 无库: docs state 待建
 - [ ] New chat can work without re-asking architecture (may still need DB if `.env` missing and project now has a backend)
 - [ ] **Step D 实测通过**（工具层真的能跑，不只是「文件已拷贝」）——BOM / 相对路径 / curl 状态码 / 空环境变量 Join-Path / PATHEXT / 热文件段有输出，逐项验过；**未过 Step D 不算装完**

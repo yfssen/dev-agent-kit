@@ -49,7 +49,7 @@ Progress:
 - [ ] 2. Merge-safe install (core + adapters)
 - [ ] 3. Resolve MERGE (read → merge → delete *.kit-new)
 - [ ] 4. Project init/learn (REQUIRED unless user skips) — see init-workflow.md
-- [ ] 5. Adapt scripts (.env path, lint, smoke, api-check)
+- [ ] 5. Fill project-progress snapshot (no YYYY-MM-DD leftover) + ADAPT kit-layout / lint / smoke / api-check
 - [ ] 6. Verify tools (db/mysql/lint/smoke/api-check/verify as available)
 ```
 
@@ -86,9 +86,10 @@ Read both sides; keep project facts; add kit tooling; delete `*.kit-new`.
 
 Before merging line by line, classify each MERGE:
 
-- Kit side is an **unfilled template** (placeholders like `<one-liner>` / `NN%` / `YYYY-MM-DD`) -> keep the project version, just delete the `*.kit-new`.
+- Kit side is an **unfilled template** (placeholders like `<one-liner>` / `NN%` / `YYYY-MM-DD`) and the project file is already filled -> keep the project snapshot facts, but **still copy new kit behavior lines** the project lacks (「改代码必须写 SSOT」, SSOT = workspace-root `docs/*.md`, multi-git). Do not revert a filled snapshot back to placeholders. Then delete `*.kit-new`.
 - Kit side is a **pure superset** (project never diverged) -> take the kit version as-is.
-- Both sides have unique content -> only these need a real line-by-line merge.
+- Both sides have unique content -> line-by-line merge. **Project facts** = `# ADAPT` values (BaseUrl, ProbePath, `.env` path, checker command, filled progress). **Kit behavior** = multi-git scan (`kit-layout`), root-docs SSOT, code extensions, cooldown. Old single-repo `git status`, `.php`-only, and 1200s cooldown are previous kit defaults, not project facts — replace them with the `*.kit-new` behavior.
+- Leaving any `*.kit-new` in place means the upgrade did not land. The installer's `MERGE GUIDE` lines say the same thing; follow them.
 
 ### 4) Project init/learn（一口气做完）
 
@@ -97,12 +98,13 @@ Before merging line by line, classify each MERGE:
 1. `./scripts/scan-project.ps1 -OutFile docs/_scan-raw.md`
 2. **向用户索要 MySQL 连接命令或 DSN**（必问）→ 有库则 `apply-mysql-dsn` 写 `.env` → 填复盘文档 → `SELECT 1`；**用户回「无库」则复盘标跳过，不写假 .env，不阻塞后续学习**
 3. Deep-read FE（+BE if any）→ `docs/项目结构与架构.md` + `AGENTS.md` + SSOT（无后端时写明待建）
-4. Point scripts `# ADAPT`（含 `.env` 路径，双 git 常为 backend；无库可暂不改 db 路径）
-5. 有库时：账号可全权限；写库须用户同意并用 `mysql.*`，且记入复盘日志
+4. **填 adapter `project-progress` 快照**（禁止留下 `YYYY-MM-DD` / `<一句话>`）；写清「改代码必须写 SSOT」
+5. Point scripts `# ADAPT`（含 `kit-layout` 多 git / 代码扩展名；`.env` 路径，双 git 常为 backend；无库可暂不改 db 路径）
+6. 有库时：账号可全权限；写库须用户同意并用 `mysql.*`，且记入复盘日志
 
 ### 5–6) Adapt + verify
 
-`# ADAPT` lint/smoke/api-check/verify paths; then spot-check tools (end with `scripts/verify`).
+`# ADAPT` kit-layout（多 git + 扩展名）/ lint/smoke/api-check/verify paths; then spot-check tools (end with `scripts/verify`). **多仓项目不 ADAPT reminder = 假自动维护。**
 **Also run [init-workflow.md](init-workflow.md) Step D** (BOM / path normalize / curl status / empty env Join-Path / PATHEXT / scan hot files actually printed) — install only copies files; it does not prove scripts work.
 
 ## Daily tools

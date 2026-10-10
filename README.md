@@ -88,6 +88,7 @@ chmod +x install-global.sh && ./install-global.sh
 | 验证 | `smoke.ps1` / `smoke.sh` | 打 HTTP 接口 | vitest / supertest | pytest |
 | 对账 | `api-check.ps1` / `api-check.sh` | 前端 URL↔后端方法 | OpenAPI schema diff | 契约检查 |
 | **验收闸** | `verify.ps1` / `verify.sh` | 串起上面三项 + SSOT | 同左 | 同左 |
+| 布局 | `kit-layout.ps1` / `.sh` | 多 git 扫描 + 根 `docs/` SSOT + 代码扩展名 | 同左 | 同左 |
 
 另有 `mysql.ps1` / `mysql.sh`（交互或批准后的写库；写库须记入 `docs/数据库连接与复盘.md`）。
 

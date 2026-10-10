@@ -28,7 +28,7 @@ fi
 if [[ "$cmd" =~ rm[[:space:]]+-[a-z]*r[a-z]*f ]] || [[ "$cmd" =~ rm[[:space:]]+-[a-z]*f[a-z]*r ]]; then
   ask "Recursive delete. Confirm the target path first."
 fi
-if [[ "$cmd" =~ (drop[[:space:]]+table|truncate|delete[[:space:]]+from|alter[[:space:]]+table) ]]; then
+if [[ "$cmd" =~ (drop[[:space:]]+table|truncate[[:space:]]+table|delete[[:space:]]+from|alter[[:space:]]+table) ]]; then
   ask "Command contains a destructive SQL write. Confirm, and log writes in docs."
 fi
 if [[ "$cmd" =~ (mysql|mariadb)[[:space:]].*(-e|--execute) ]]; then

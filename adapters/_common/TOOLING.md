@@ -71,11 +71,22 @@
 ./scripts/verify.sh                  # 可选 --target <文件> --full --ssot-strict
 ```
 
-一条命令串起上面的 lint（git 改动的代码文件）+ api-check + SSOT 是否回写 + 可选 smoke，打出 **PASS / FAIL / SKIP / WARN**，最后一行 `== Result: PASS|FAIL ==`。
+一条命令串起上面的 lint（**工作区内所有 git 仓**的改动代码）+ api-check + SSOT 是否回写 + 可选 smoke，打出 **PASS / FAIL / SKIP / WARN**，最后一行 `== Result: PASS|FAIL ==`。
 - **只有 FAIL 算没过闸**（exit 1）。缺 checker、没起服务、路径未配置 → SKIP，不挡未配好的项目。
-- 代码改了但 `docs/*.md` 没动 → 默认 WARN（`-SsotStrict` 才升为 FAIL）。
-- smoke 默认探测 `$BaseUrl`，不通就 SKIP；本地服务已起或要强制跑：`-Full` / `--full`。
+- SSOT = **工作区根**顶级 `docs/*.md`（不是子仓里的 docs）。判定：根 git 里这些文件脏了，**或**最新 SSOT 的 mtime ≥ 最新改动代码 mtime − 2s。
+- 代码改了但根 `docs/*.md` 没动 → 默认 WARN（`-SsotStrict` 才升为 FAIL）。
+- smoke 探测的是**本项目 API**（GET `$BaseUrl` + 与 smoke 相同的第一个公开端点，响应里要有 `"code"`）。端口上是别的站点（phpstudy 默认页等）→ SKIP，不把完成闸卡死。要强制跑：`-Full` / `--full`。
 - **声称任务做完之前必须 `Result: PASS`**，不要用「我觉得过了」代替。
+
+布局与扩展名在 `scripts/kit-layout.ps1` / `kit-layout.sh`（`$KitCodeExts` / `KIT_CODE_EXT` 默认 php/vue/js/ts/sql；可选 `$KitRepoNames` 限制子仓名单，空则自动发现一级子目录 `.git`）。
+
+## 5b. 多 git / 根 docs（装完必认清）
+
+同目录多仓（`admin/`、`pc_web/` … 各有 `.git`，工作区根常常**没有** `.git`）是一等公民，不是「单仓 PHP」特例。
+
+- `verify` / `ssot-reminder` 扫：根若是 git 则计入，**再加上**每个一级子目录里的 `.git`。
+- **多仓项目若不 ADAPT `kit-layout` / reminder，自动维护是假的**：旧逻辑只对工作区根跑 `git status`，根上无 `.git` 就直接 exit 0，永远不催补进度。
+- 「改了代码」看 kit-layout 的扩展名，不是 lint 的 checker 扩展名。默认 `php -l` 对 `.vue` 会 skip（exit 0），但 `.vue` 仍算代码，会 nudge / 进 verify 的 SSOT 检查。
 
 ## 6. 标准工作闭环
 

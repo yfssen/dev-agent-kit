@@ -182,6 +182,11 @@ if ($mergeList.Count -gt 0) {
     Write-Host "Merge these (read existing + *.kit-new, keep project facts, add kit tooling):"
     foreach ($m in $mergeList) { Write-Host "  - $m" }
     Write-Host "After merge, delete the sibling *.kit-new files."
+    Write-Host "MERGE GUIDE: keep project # ADAPT values (BaseUrl, ProbePath, .env path, checker command, filled progress snapshot)."
+    Write-Host "MERGE GUIDE: take kit behavior from *.kit-new (kit-layout multi-git, workspace-root docs SSOT, code extensions, cooldown)."
+    Write-Host "MERGE GUIDE: single-repo git status, .php-only, and 1200s cooldown are old kit defaults, not project facts. Replace them."
+    Write-Host "MERGE GUIDE: ssot-reminder must not print followup_message. Drop the stop hook. Verify owns the SSOT WARN."
+    Write-Host "MERGE GUIDE: leaving *.kit-new unmerged means this upgrade did not land."
     exit 2
 }
 Write-Host "Next: fill placeholders / # ADAPT if still templated."

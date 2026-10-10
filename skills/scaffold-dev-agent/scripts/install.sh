@@ -216,6 +216,11 @@ if [ "$merged" -gt 0 ]; then
   echo "Merge these (read existing + *.kit-new, keep project facts, add kit tooling):"
   printf '%s\n' "$merge_list"
   echo "After merge, delete the sibling *.kit-new files."
+  echo "MERGE GUIDE: keep project # ADAPT values (BaseUrl, ProbePath, .env path, checker command, filled progress snapshot)."
+  echo "MERGE GUIDE: take kit behavior from *.kit-new (kit-layout multi-git, workspace-root docs SSOT, code extensions, cooldown)."
+  echo "MERGE GUIDE: single-repo git status, .php-only, and 1200s cooldown are old kit defaults, not project facts. Replace them."
+  echo "MERGE GUIDE: ssot-reminder must not print followup_message. Drop the stop hook. Verify owns the SSOT WARN."
+  echo "MERGE GUIDE: leaving *.kit-new unmerged means this upgrade did not land."
   exit 2
 fi
 echo "Next: fill placeholders / # ADAPT if still templated."

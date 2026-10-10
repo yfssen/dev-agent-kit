@@ -26,6 +26,20 @@ case "$TARGET" in
   *) ABS="$ROOT/$TARGET" ;;
 esac
 
+if [ ! -e "$ABS" ]; then
+  echo "Target not found: $TARGET" >&2
+  exit 2
+fi
+
+# Skip before resolving the checker: .vue/.js count as "code" for SSOT, but php -l cannot parse them.
+# ADAPT: extensions this checker can actually parse
+if [ ! -d "$ABS" ]; then
+  case "$ABS" in
+    *.php) ;;
+    *) echo "OK: skip (not a lint target): $TARGET"; exit 0 ;;
+  esac
+fi
+
 # --- Resolve checker (example: PHP CLI) ---   # ADAPT
 PHP_BIN=""
 if [ -n "${LZ_PHP:-}" ] && [ -x "$LZ_PHP" ]; then
@@ -35,11 +49,6 @@ elif command -v php >/dev/null 2>&1; then
 fi
 if [ -z "$PHP_BIN" ]; then
   echo "checker not found. Set LZ_PHP or add it to PATH. (NOT a syntax error.)" >&2
-  exit 2
-fi
-
-if [ ! -e "$ABS" ]; then
-  echo "Target not found: $TARGET" >&2
   exit 2
 fi
 

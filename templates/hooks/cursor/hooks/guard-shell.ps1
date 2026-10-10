@@ -22,7 +22,9 @@ function Emit-Ask([string]$msg) {
 }
 
 if (-not $raw) { Emit-Allow }
-try { $j = $raw | ConvertFrom-Json } catch { Emit-Allow }
+# ConvertFrom-Json is non-terminating under SilentlyContinue; -ErrorAction Stop
+# makes catch actually run (fail-open on bad JSON).
+try { $j = $raw | ConvertFrom-Json -ErrorAction Stop } catch { Emit-Allow }
 
 $cmd = ""
 if ($j.command) { $cmd = [string]$j.command }
@@ -40,7 +42,7 @@ if ($c -match '(?i)git\s+reset\s+--hard' -or $c -match '(?i)git\s+clean\s+-[a-z]
 if ($c -match '(?i)rm\s+-[a-z]*r[a-z]*f' -or $c -match '(?i)rm\s+-[a-z]*f[a-z]*r' -or $c -match '(?i)Remove-Item[^\r\n]*-Recurse') {
     Emit-Ask "Recursive delete. Confirm the target path first."
 }
-if ($c -match '(?i)(drop\s+table|truncate\s+table|truncate\s+|delete\s+from|alter\s+table)') {
+if ($c -match '(?i)(drop\s+table|truncate\s+table|delete\s+from|alter\s+table)') {
     Emit-Ask "Command contains a destructive SQL write. Confirm, and log writes in docs."
 }
 if ($c -match '(?i)(mysql|mariadb)\b[^\r\n]*(-e|--execute)') {
