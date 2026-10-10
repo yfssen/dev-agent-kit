@@ -239,6 +239,21 @@ try {
         (Get-Item (Join-Path $mg "docs\progress.md")).LastWriteTimeUtc = [datetime]::UtcNow
         if (Test-KitSsotFresh $mg $mgCode) { Ok "root docs mtime SSOT fresh" } else { Bad "SSOT should be fresh after touching workspace-root docs/*.md" }
 
+        # Remaining edits are older than SSOT. A deleted path must still count
+        # (parent dir mtime), otherwise delete-only trees look fresh.
+        (Get-Item (Join-Path $mg "pc_web\a.vue")).LastWriteTimeUtc = [datetime]::UtcNow.AddMinutes(-30)
+        Remove-Item -LiteralPath (Join-Path $mg "admin\x.php") -Force
+        $adminDir = Get-Item (Join-Path $mg "admin")
+        $adminDir.LastWriteTimeUtc = [datetime]::UtcNow
+        $docsAfterDel = Get-Item (Join-Path $mg "docs\progress.md")
+        $docsAfterDel.LastWriteTimeUtc = $adminDir.LastWriteTimeUtc.AddMinutes(-5)
+        $mgDel = @(Get-KitChangedCode $mg)
+        $mgDelJoined = ($mgDel -join '|')
+        if ($mgDelJoined -match 'admin/.+\.php') { Ok "deleted php stays in changed code" } else { Bad "deleted code should stay in changed list, got: $mgDelJoined" }
+        if (-not (Test-KitSsotFresh $mg $mgDel)) { Ok "deleted code keeps SSOT stale" } else { Bad "SSOT should be stale when code was deleted and root docs not updated" }
+        $docsAfterDel.LastWriteTimeUtc = $adminDir.LastWriteTimeUtc.AddMinutes(5)
+        if (Test-KitSsotFresh $mg $mgDel) { Ok "deleted code SSOT fresh after docs touch" } else { Bad "SSOT should be fresh after updating root docs following a deletion" }
+
         & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $mg "scripts\lint.ps1") (Join-Path $mg "pc_web\a.vue") | Out-Null
         if ($LASTEXITCODE -eq 0) { Ok "lint skips .vue (not php -l)" } else { Bad "lint .vue should skip exit 0, got $LASTEXITCODE" }
       } finally {
@@ -317,6 +332,14 @@ try {
       if (Test-Path $c) { $gitBash = $c; break }
     }
     if (-not $gitBash) {
+      $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+      if ($gitCmd) {
+        $gitRoot = Split-Path (Split-Path $gitCmd.Source -Parent) -Parent
+        $beside = Join-Path $gitRoot "bin\bash.exe"
+        if (Test-Path $beside) { $gitBash = $beside }
+      }
+    }
+    if (-not $gitBash) {
       $cmdBash = Get-Command bash -ErrorAction SilentlyContinue
       if ($cmdBash -and $cmdBash.Source -notmatch '\\Windows\\[Ss]ystem32\\bash\.exe$') {
         $gitBash = $cmdBash.Source
@@ -342,6 +365,37 @@ try {
         [IO.File]::WriteAllText($tmpKl, $lfKl, (New-Object System.Text.UTF8Encoding $false))
         & $gitBash -n $tmpKl 2>$null
         if ($LASTEXITCODE -eq 0) { Ok "kit-layout.sh bash -n syntax OK" } else { Bad "kit-layout.sh bash -n failed exit=$LASTEXITCODE" }
+        $klUnix = (& $gitBash -c "cygpath -u '$($tmpKl -replace '\\','/')'").Trim()
+        $delProbe = Join-Path $work "_kit-del-ssot.sh"
+        $delBody = @"
+set +e
+. "$klUnix"
+root=`$(mktemp -d)
+mkdir -p "`$root/docs" "`$root/app"
+echo ssot > "`$root/docs/progress.md"
+(
+  cd "`$root/app" || exit 1
+  git init -q
+  printf '%s\n' '<?php echo 1;' > a.php
+  git -c user.email=kit@example.com -c user.name=kit add -A
+  git -c user.email=kit@example.com -c user.name=kit commit -qm init
+  rm -f a.php
+)
+code=`$(kit_changed_code "`$root")
+touch -d "10 minutes ago" "`$root/docs/progress.md"
+touch "`$root/app"
+if kit_ssot_fresh "`$root" `$code; then echo BAD_FRESH; rm -rf "`$root"; exit 2; fi
+touch "`$root/docs/progress.md"
+if kit_ssot_fresh "`$root" `$code; then rm -rf "`$root"; exit 0; fi
+echo BAD_STALE
+rm -rf "`$root"
+exit 3
+"@
+        $delBody = ($delBody -replace "`r`n", "`n" -replace "`r", "`n")
+        [IO.File]::WriteAllText($delProbe, $delBody, (New-Object System.Text.UTF8Encoding $false))
+        $delOut = & $gitBash $delProbe 2>&1 | ForEach-Object { "$_" }
+        if ($delOut) { $delOut | ForEach-Object { Write-Host $_ } }
+        if ($LASTEXITCODE -eq 0) { Ok "kit-layout.sh deleted code keeps SSOT stale until docs touch" } else { Bad "kit-layout.sh deletion SSOT expected exit 0, got $LASTEXITCODE" }
       } else {
         Bad "templates/scripts/kit-layout.sh missing"
       }

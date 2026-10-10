@@ -91,17 +91,34 @@ EOF
 }
 
 # Exit 0 if SSOT looks fresh. Args: workspace, then code rel paths.
+# A removed path has no mtime. Use the nearest existing parent directory
+# (deletion updates that mtime) so a delete-only tree is not "nothing to compare".
 kit_ssot_fresh() {
   ws="$1"; shift
   if kit_root_ssot_in_git "$ws"; then return 0; fi
   [ $# -eq 0 ] && return 0
   max_code=0
+  missing_untimed=0
   for rel in "$@"; do
     f="$ws/$rel"
-    [ -f "$f" ] || continue
-    t=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+    t=0
+    if [ -f "$f" ]; then
+      t=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+    else
+      dir=$(dirname "$f")
+      while [ ! -d "$dir" ]; do
+        parent=$(dirname "$dir")
+        [ "$parent" = "$dir" ] && break
+        dir=$parent
+      done
+      if [ -d "$dir" ]; then
+        t=$(stat -c %Y "$dir" 2>/dev/null || stat -f %m "$dir" 2>/dev/null || echo 0)
+      fi
+      [ "$t" -eq 0 ] && missing_untimed=1
+    fi
     [ "$t" -gt "$max_code" ] && max_code=$t
   done
+  [ "$missing_untimed" = "1" ] && [ "$max_code" -eq 0 ] && return 1
   [ "$max_code" -eq 0 ] && return 0
   max_ssot=0
   ssot_any=0

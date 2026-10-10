@@ -88,7 +88,9 @@ function Test-KitRootSsotInGit([string]$ws) {
     return $false
 }
 
-# True = SSOT looks updated (or there is nothing to compare). False = nudge / WARN.
+# True = SSOT looks updated. False = nudge / WARN.
+# A removed path has no mtime. Use the nearest existing parent directory
+# (deletion updates that mtime) so a delete-only tree is not "nothing to compare".
 function Test-KitSsotFresh([string]$ws, $codeRels) {
     if (Test-KitRootSsotInGit $ws) { return $true }
     # @() so a single string is 1 path, not a char array (.Count would be Length).
@@ -99,12 +101,27 @@ function Test-KitSsotFresh([string]$ws, $codeRels) {
     if ($ssot.Count -eq 0) { return $false }
 
     $maxCode = $null
+    $missingUntimed = $false
     foreach ($rel in $rels) {
         $abs = Join-Path $ws (($rel -replace '/', [char][IO.Path]::DirectorySeparatorChar))
-        if (-not (Test-Path -LiteralPath $abs)) { continue }
-        $t = (Get-Item -LiteralPath $abs).LastWriteTimeUtc
-        if ($null -eq $maxCode -or $t -gt $maxCode) { $maxCode = $t }
+        $stamp = $null
+        if (Test-Path -LiteralPath $abs) {
+            $stamp = (Get-Item -LiteralPath $abs).LastWriteTimeUtc
+        } else {
+            $dir = Split-Path -Parent $abs
+            while ($dir -and -not (Test-Path -LiteralPath $dir)) {
+                $parent = Split-Path -Parent $dir
+                if (-not $parent -or $parent -eq $dir) { $dir = $null; break }
+                $dir = $parent
+            }
+            if ($dir -and (Test-Path -LiteralPath $dir)) {
+                $stamp = (Get-Item -LiteralPath $dir).LastWriteTimeUtc
+            }
+            if ($null -eq $stamp) { $missingUntimed = $true }
+        }
+        if ($null -ne $stamp -and ($null -eq $maxCode -or $stamp -gt $maxCode)) { $maxCode = $stamp }
     }
+    if ($missingUntimed -and $null -eq $maxCode) { return $false }
     if ($null -eq $maxCode) { return $true }
 
     $maxSsot = $null
