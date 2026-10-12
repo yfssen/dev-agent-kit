@@ -184,6 +184,7 @@ if ($mergeList.Count -gt 0) {
     Write-Host "After merge, delete the sibling *.kit-new files."
     Write-Host "MERGE GUIDE: keep project # ADAPT values (BaseUrl, ProbePath, .env path, checker command, filled progress snapshot)."
     Write-Host "MERGE GUIDE: take kit behavior from *.kit-new (kit-layout multi-git, workspace-root docs SSOT, code extensions, cooldown)."
+    Write-Host "MERGE GUIDE: Git layout in scripts/scan-project.ps1 and .sh is new kit behavior. Old projects lack ## Git layout and repo_remotes. Take that section from *.kit-new, then run the merged scan. Record repos that already exist. Ask once only for project dirs that still have no .git. For each repo_remotes value none, ask once for an existing git URL or skip, and add it only with scripts/git-remote-add. Do not open a Gitee or GitHub repo. Do not commit. Do not push. Do not git config. Do not redo init."
     Write-Host "MERGE GUIDE: single-repo git status, .php-only, and 1200s cooldown are old kit defaults, not project facts. Replace them."
     Write-Host "MERGE GUIDE: ssot-reminder must not print followup_message. Drop the stop hook. Verify owns the SSOT WARN."
     Write-Host "MERGE GUIDE: leaving *.kit-new unmerged means this upgrade did not land."

@@ -55,6 +55,82 @@ tmp=$(mktemp)
       | head -n 8 | while read -r f; do echo "- ${f#$ROOT/}"; done
   done
   echo ""
+  echo "## Git layout"
+  own=no
+  [ -d "$ROOT/.git" ] && own=yes
+  echo "- own_git: $own"
+  parent=no
+  if command -v git >/dev/null 2>&1; then
+    if top=$(cd "$ROOT" && git rev-parse --show-toplevel 2>/dev/null); then
+      root_phys=$(cd "$ROOT" && pwd)
+      [ "$top" != "$root_phys" ] && parent=$top
+    fi
+  fi
+  echo "- parent_git: $parent"
+  with_git=""
+  without_git=""
+  for p in "$ROOT"/*; do
+    [ -d "$p" ] || continue
+    base=$(basename "$p")
+    case "$base" in
+      node_modules|vendor|dist|unpackage|uni_modules|docs|scripts|.git|.cursor|.kiro|.codebuddy|.qoder|.github) continue ;;
+    esac
+    if [ -d "$p/.git" ]; then
+      with_git="${with_git:+$with_git, }$base"
+    else
+      without_git="${without_git:+$without_git, }$base"
+    fi
+  done
+  echo "- children_with_git: ${with_git:-none}"
+  echo "- project_dirs_without_git: ${without_git:-none}"
+  remotes=none
+  if [ "$own" = "yes" ] && command -v git >/dev/null 2>&1; then
+    rv=$(cd "$ROOT" && git remote -v 2>/dev/null || true)
+    [ -n "$rv" ] && remotes=$(printf '%s' "$rv" | tr '\n' '; ')
+  fi
+  echo "- remotes: $remotes"
+  remote_names() {
+    dir="$1"
+    if ! command -v git >/dev/null 2>&1; then
+      printf 'none'
+      return
+    fi
+    names=$(cd "$dir" && git remote 2>/dev/null | tr '\n' ',' || true)
+    names=${names%,}
+    if [ -z "$names" ]; then
+      printf 'none'
+    else
+      printf '%s' "$names"
+    fi
+  }
+  rr=""
+  add_rr() {
+    if [ -z "$rr" ]; then rr="$1"; else rr="$rr; $1"; fi
+  }
+  if [ "$own" = "yes" ]; then
+    add_rr "root=$(remote_names "$ROOT")"
+  fi
+  for p in "$ROOT"/*; do
+    [ -d "$p" ] || continue
+    base=$(basename "$p")
+    case "$base" in
+      node_modules|vendor|dist|unpackage|uni_modules|docs|scripts|.git|.cursor|.kiro|.codebuddy|.qoder|.github) continue ;;
+    esac
+    if [ -d "$p/.git" ]; then
+      add_rr "$base=$(remote_names "$p")"
+    fi
+  done
+  echo "- repo_remotes: ${rr:-none}"
+  advice=record_single
+  if [ "$own" = "no" ] && [ "$parent" != "no" ]; then advice=ask_parent
+  elif [ "$own" = "yes" ] && [ -n "$with_git" ]; then advice=nested
+  elif [ "$own" = "yes" ]; then advice=record_single
+  elif [ -n "$with_git" ] && [ -z "$without_git" ]; then advice=record_multi
+  elif [ -z "$without_git" ]; then advice=ask_empty
+  else advice=ask_children
+  fi
+  echo "- advice: $advice"
+  echo ""
   echo "## Git hot files (last 20 commits, top 12)"
   # Git for Windows does not accept msys paths (/e/www/...). cd in bash, then git
   # without -C. If root is not a repo, fall back to a single child .git (dual-git

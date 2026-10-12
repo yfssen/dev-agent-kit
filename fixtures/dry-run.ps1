@@ -74,6 +74,7 @@ try {
     "scripts\mysql.ps1", "scripts\mysql.sh",
     "scripts\scan-project.ps1", "scripts\scan-project.sh",
     "scripts\apply-mysql-dsn.ps1", "scripts\apply-mysql-dsn.sh",
+    "scripts\git-remote-add.ps1", "scripts\git-remote-add.sh",
     ".cursor\rules\tooling.mdc", ".cursor\rules\coding.mdc",
     "CLAUDE.md", ".kiro\steering\tooling.md", "AGENTS.md"
   )
@@ -154,8 +155,71 @@ try {
     if ($vText -match '\[SKIP\] smoke') { Ok "verify skips smoke when server down" } else { Bad "verify should SKIP smoke without server" }
     if ($vText -match '== Result: FAIL') { Ok "verify Result FAIL when a check FAILs" } else { Bad "verify should print Result FAIL" }
 
-    # Fixture copy is not a repo; init one to exercise lint + SSOT WARN.
+    # Fixture copy is not a repo. git rev-parse exits 128; the scan must not leak it.
+    # backend/ + frontend/ have no .git, so advice is ask_children.
+    # Write-Host is not in the pipeline; read the outfile.
+    & .\scripts\scan-project.ps1 -OutFile "docs\_scan-raw.md" | Out-Null
+    $scanCode = $LASTEXITCODE
+    $scanText = ""
+    $scanFile = Join-Path (Get-Location) "docs\_scan-raw.md"
+    if (Test-Path $scanFile) {
+      $scanText = Get-Content $scanFile -Raw
+      # Drop it before git init. A fresh docs/*.md makes the next SSOT check look updated.
+      Remove-Item $scanFile -Force
+    }
+    if ($scanCode -eq 0) { Ok "scan-project non-repo exits 0" } else { Bad "scan-project non-repo leaked exit $scanCode" }
+    if ($scanText -match 'advice: ask_children' -and $scanText -match 'project_dirs_without_git:.*backend' -and $scanText -match 'frontend') {
+      Ok "scan Git layout lists project dirs without git"
+    } else {
+      Bad "scan Git layout should be ask_children for backend+frontend"
+    }
+    if ($scanText -match 'repo_remotes: none') { Ok "scan repo_remotes none before any git" } else { Bad "scan repo_remotes should be none" }
+
+    # Init a repo to exercise lint + SSOT WARN.
     if (Get-Command git -ErrorAction SilentlyContinue) {
+      $remoteProj = Join-Path $env:TEMP ("dev-agent-kit-remote-" + [guid]::NewGuid().ToString("n"))
+      $bare = Join-Path $env:TEMP ("dev-agent-kit-bare-" + [guid]::NewGuid().ToString("n") + ".git")
+      try {
+        New-Item -ItemType Directory -Force (Join-Path $remoteProj "scripts"), (Join-Path $remoteProj "app"), (Join-Path $remoteProj "docs") | Out-Null
+        Copy-Item (Join-Path $KitRoot "templates\scripts\git-remote-add.ps1") (Join-Path $remoteProj "scripts\git-remote-add.ps1") -Force
+        Copy-Item (Join-Path $KitRoot "templates\scripts\scan-project.ps1") (Join-Path $remoteProj "scripts\scan-project.ps1") -Force
+        & git init -q (Join-Path $remoteProj "app") 2>$null
+        & git init -q --bare $bare 2>$null
+        $add = Join-Path $remoteProj "scripts\git-remote-add.ps1"
+        $env:GIT_TERMINAL_PROMPT = "0"
+        & $add -Repo app -Url "https://example.com/a.git && calc" | Out-Null
+        if ($LASTEXITCODE -eq 2) { Ok "git-remote-add rejects bad url" } else { Bad "git-remote-add bad url exit $LASTEXITCODE" }
+        & git -C (Join-Path $remoteProj "app") remote add origin "https://example.com/already.git" 2>$null
+        & $add -Repo app -Url "https://example.com/other.git" | Out-Null
+        if ($LASTEXITCODE -eq 2) { Ok "git-remote-add leaves existing remote" } else { Bad "git-remote-add existing remote exit $LASTEXITCODE" }
+        $still = (& git -C (Join-Path $remoteProj "app") remote get-url origin 2>$null | Out-String).Trim()
+        if ($still -eq "https://example.com/already.git") { Ok "git-remote-add did not replace origin" } else { Bad "origin changed to $still" }
+        & git -C (Join-Path $remoteProj "app") remote remove origin 2>$null
+        & $add -Repo app -Url "https://127.0.0.1:1/nope.git" | Out-Null
+        if ($LASTEXITCODE -eq 3) { Ok "git-remote-add removes remote when ls-remote fails" } else { Bad "dead remote exit $LASTEXITCODE" }
+        $left = @(& git -C (Join-Path $remoteProj "app") remote 2>$null)
+        if ($left.Count -eq 0) { Ok "failed remote was removed" } else { Bad "dead remote still present" }
+        $fileUrl = "file:///" + ($bare -replace '\\', '/')
+        & $add -Repo app -Url $fileUrl | Out-Null
+        if ($LASTEXITCODE -ne 0) { Bad "git-remote-add bare remote exit $LASTEXITCODE" }
+        else {
+          git -C (Join-Path $remoteProj "app") ls-remote origin 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { Ok "git-remote-add proves local bare remote" } else { Bad "ls-remote after add failed" }
+        }
+        Push-Location $remoteProj
+        try {
+          & .\scripts\scan-project.ps1 -OutFile "docs\_scan-raw.md" | Out-Null
+          $rr = ""
+          $rrFile = Join-Path $remoteProj "docs\_scan-raw.md"
+          if (Test-Path $rrFile) { $rr = Get-Content $rrFile -Raw }
+          if ($rr -match 'repo_remotes: app=origin') { Ok "scan repo_remotes names the child remote" } else { Bad "scan repo_remotes missing app=origin" }
+        } finally {
+          Pop-Location
+        }
+      } finally {
+        if (Test-Path $remoteProj) { Remove-Item $remoteProj -Recurse -Force -ErrorAction SilentlyContinue }
+        if (Test-Path $bare) { Remove-Item $bare -Recurse -Force -ErrorAction SilentlyContinue }
+      }
       & git init -q 2>$null
       & git -c user.email=kit@example.com -c user.name=kit add -A 2>$null
       & git -c user.email=kit@example.com -c user.name=kit commit -qm dryrun-init 2>$null
@@ -398,6 +462,16 @@ exit 3
         if ($LASTEXITCODE -eq 0) { Ok "kit-layout.sh deleted code keeps SSOT stale until docs touch" } else { Bad "kit-layout.sh deletion SSOT expected exit 0, got $LASTEXITCODE" }
       } else {
         Bad "templates/scripts/kit-layout.sh missing"
+      }
+
+      $remoteSh = Join-Path (Get-Location) "scripts\git-remote-add.sh"
+      if (Test-Path $remoteSh) {
+        $lfR = ([IO.File]::ReadAllText($remoteSh) -replace "`r`n", "`n" -replace "`r", "`n")
+        [IO.File]::WriteAllText($remoteSh, $lfR, (New-Object System.Text.UTF8Encoding $false))
+        & $gitBash -n $remoteSh 2>$null
+        if ($LASTEXITCODE -eq 0) { Ok "git-remote-add.sh bash -n syntax OK" } else { Bad "git-remote-add.sh bash -n failed exit=$LASTEXITCODE" }
+      } else {
+        Bad "scripts/git-remote-add.sh missing in workdir"
       }
 
       $verifySh = Join-Path (Get-Location) "scripts\verify.sh"

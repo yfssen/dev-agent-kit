@@ -84,6 +84,68 @@ foreach ($d in $dirs) {
 }
 L ""
 
+# One label for install and upgrade. Kit files (docs/scripts/tool dirs) are not projects.
+L "## Git layout"
+$skipDir = @('node_modules','vendor','dist','unpackage','uni_modules','docs','scripts','.git','.cursor','.kiro','.codebuddy','.qoder','.github')
+$ownGit = Test-Path (Join-Path $Root ".git")
+L ("- own_git: " + $(if ($ownGit) { "yes" } else { "no" }))
+$parentGit = "no"
+$gitCmd = Get-Command git -ErrorAction SilentlyContinue
+if ($gitCmd) {
+    $global:LASTEXITCODE = $null
+    $topRaw = @(git -C $Root rev-parse --show-toplevel 2>$null)
+    if ($global:LASTEXITCODE -eq 0 -and $topRaw.Count -gt 0) {
+        $topFull = [IO.Path]::GetFullPath([string]$topRaw[0]).Trim()
+        $rootFull = [IO.Path]::GetFullPath($Root)
+        if ($topFull.TrimEnd('\','/') -ne $rootFull.TrimEnd('\','/')) { $parentGit = $topFull }
+    }
+}
+L ("- parent_git: " + $parentGit)
+$childGit = New-Object System.Collections.Generic.List[string]
+$childPlain = New-Object System.Collections.Generic.List[string]
+Get-ChildItem $Root -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($skipDir -contains $_.Name.ToLower()) { return }
+    if (Test-Path (Join-Path $_.FullName ".git")) { $childGit.Add($_.Name) | Out-Null }
+    else { $childPlain.Add($_.Name) | Out-Null }
+}
+if ($childGit.Count -eq 0) { L "- children_with_git: none" } else { L ("- children_with_git: " + ($childGit -join ", ")) }
+if ($childPlain.Count -eq 0) { L "- project_dirs_without_git: none" } else { L ("- project_dirs_without_git: " + ($childPlain -join ", ")) }
+$remotes = "none"
+if ($ownGit -and $gitCmd) {
+    $global:LASTEXITCODE = $null
+    $rv = @(git -C $Root remote -v 2>$null)
+    if ($rv.Count -gt 0) { $remotes = ($rv -join "; ") }
+}
+L ("- remotes: " + $remotes)
+function Get-RepoRemoteNames([string]$repoPath) {
+    if (-not $gitCmd) { return "none" }
+    $global:LASTEXITCODE = $null
+    $names = @(git -C $repoPath remote 2>$null)
+    if ($global:LASTEXITCODE -ne 0 -or $names.Count -eq 0) { return "none" }
+    $clean = @()
+    foreach ($n in $names) {
+        $t = ([string]$n).Trim()
+        if ($t) { $clean += $t }
+    }
+    if ($clean.Count -eq 0) { return "none" }
+    return ($clean -join ",")
+}
+$repoRemoteParts = New-Object System.Collections.Generic.List[string]
+if ($ownGit) { [void]$repoRemoteParts.Add("root=" + (Get-RepoRemoteNames $Root)) }
+foreach ($cg in $childGit) {
+    [void]$repoRemoteParts.Add($cg + "=" + (Get-RepoRemoteNames (Join-Path $Root $cg)))
+}
+if ($repoRemoteParts.Count -eq 0) { L "- repo_remotes: none" } else { L ("- repo_remotes: " + ($repoRemoteParts -join "; ")) }
+$advice = "record_single"
+if (-not $ownGit -and $parentGit -ne "no") { $advice = "ask_parent" }
+elseif ($ownGit -and $childGit.Count -gt 0) { $advice = "nested" }
+elseif ($ownGit) { $advice = "record_single" }
+elseif ($childGit.Count -gt 0 -and $childPlain.Count -eq 0) { $advice = "record_multi" }
+elseif ($childPlain.Count -eq 0) { $advice = "ask_empty" }
+else { $advice = "ask_children" }
+L ("- advice: " + $advice)
+L ""
+
 # Recent churn (helps locate logic without dumping the tree)
 L "## Git hot files (last 20 commits, top 12)"
 $gitCmd = Get-Command git -ErrorAction SilentlyContinue
@@ -137,3 +199,7 @@ if ($OutFile) {
     [System.IO.File]::WriteAllText($OutFile, $text, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ("Wrote " + $OutFile)
 }
+# git rev-parse exits 128 outside a work tree. The scan above already recorded
+# that and is done. Without an explicit exit, PowerShell keeps 128 as the
+# script exit code (false FAIL). A finished scan is 0.
+exit 0

@@ -47,6 +47,50 @@ Frontend-only (common early stage):
 ./scripts/scan-project.sh docs/_scan-raw.md
 ```
 
+## Step A2 — Git layout（安装和升级都读这一段）
+
+读扫描里的 `## Git layout`，只看 `- advice:`。不在 Gitee/GitHub 上新建仓库，不 `git config`，不提交，不推送。已有的远程地址在 Step A3 问。
+
+升级时项目里可能还是旧的 `scripts/scan-project`，没有下面这张表。先把套件 `*.kit-new` 里的 `## Git layout` 合进项目脚本，再跑合完的扫描。没有这段就还是旧能力。
+
+| advice | 安装时 | 升级时（脚本已含 Git layout） |
+|--------|--------|--------|
+| `record_single` | 记「单仓」，不问 | 同样只记，不改 |
+| `record_multi` | 记「多仓」和已有 `.git` 的子目录，不问。根目录保持没有 git | 同样只记 |
+| `ask_empty` | 问一次：不建 / 当前目录一个仓 / 先建子目录再各自建仓（可只先做一边） | 不再问。空目录选择只在第一次安装做 |
+| `ask_children` | 只对 `project_dirs_without_git` 问一次：各建本机仓，或当前目录一个仓。根目录在「各建」时不建 git | 只列出还没有 `.git` 的目录，问一次。已有仓库不动 |
+| `ask_parent` | 问一次：算上层仓库的一部分，还是当前目录单独建仓 | 同样问一次，不擅自建 |
+| `nested` | 报告嵌套仓库（根和子目录都有 `.git`）。不再建仓 | 同样只报告 |
+
+用户选定要建的文件夹后：先写 `.gitignore`（至少 `.env`、`node_modules`、`vendor`），再在该文件夹 `git init`。已有 `.git` 的跳过。`docs/`、`scripts/` 不建仓。
+
+## Step A3 — 已有远程地址（安装和升级都问；必问一次）
+
+本机仓库定下来之后再问。扫描 `- repo_remotes:` 里值是 `none` 的每一项问一个地址。`root=none` 表示工作区根这个仓库。子目录写成 `backend=none` 这种。已经有远程名的项不再问。
+
+服务器上的空仓库由用户事先建好。工具只把地址写进本机仓库。
+
+```text
+这些本机仓库还没有远程地址：（按扫描列出）
+请给每个目录一个已存在的地址：git@服务器:路径.git ，或 ssh:// ，或 https:// 。
+全部不要远程，回复「无远程」。
+某一个不要，写「目录名 无远程」。
+```
+
+用户给了地址才运行（密码不要写进 Markdown；回复里也不要回显带密码的 URL）：
+
+```powershell
+./scripts/git-remote-add.ps1 -Repo backend -Url 'git@服务器:backend.git'
+```
+
+```bash
+./scripts/git-remote-add.sh --repo backend --url 'git@服务器:backend.git'
+```
+
+脚本用 `git ls-remote` 核对。成功才留下远程。失败会删掉刚加上的远程，并告诉用户。不 `git config`，不提交，不推送。
+
+用户回「无远程」：在进度里记下跳过，不算初始化失败。升级时同样只问仍然是 `none` 的仓库。
+
 ## Step B — Ask for MySQL connection（必问；有库才写入）
 
 **Do not guess password.**  
@@ -120,7 +164,8 @@ Checklist:
 Learn progress:
 - [ ] Asked user for MySQL (or user said 无库 → 复盘 marked 跳过)
 - [ ] SELECT 1 ok / FAIL recorded / N/A (无库)
-- [ ] Repo layout (single / dual-git / same-folder multi-git / frontend-only)
+- [ ] Git layout from scan advice (record, or the one question answered; local git init only where chosen)
+- [ ] Remote URL asked for each repo_remotes=none (or user said 无远程). git-remote-add ls-remote ok / skipped
 - [ ] project-progress snapshot filled (no YYYY-MM-DD leftover)
 - [ ] kit-layout ADAPT'd (child .git + code exts) OR confirmed single-repo PHP default is correct
 - [ ] Backend / frontend stack + CRUD conventions (or 后端待建)

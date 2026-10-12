@@ -7,8 +7,9 @@ description: >-
   names. Then scaffold the project (memory + scripts + SSOT + adapters) and
   run init/learn: structure, architecture, CRUD, dual-git. MUST ask for a
   MySQL connection command/DSN, or accept「无库」for frontend-only projects.
-description_zh: "本机已有的开发智能体安装技能。用户说 scaffold-dev-agent、开发智能体、项目初始化时直接读本文件；init-workflow.md 在同目录，不是另一个技能。不要用 find-skills，不要去技能市场搜索这两个名字。有库要 MySQL，无库可回「无库」。"
-description_en: "Local skill, already installed. When the user names scaffold-dev-agent or init-workflow, read this file and the sibling init-workflow.md. Do not search the skill marketplace or find-skills. Ask for MySQL or accept 无库."
+  Ask for an existing git remote URL per repo, or accept「无远程」.
+description_zh: "本机已有的开发智能体安装技能。用户说 scaffold-dev-agent、开发智能体、项目初始化时直接读本文件；init-workflow.md 在同目录，不是另一个技能。不要用 find-skills，不要去技能市场搜索这两个名字。有库要 MySQL，无库可回「无库」。已有 git 地址问一次，可回「无远程」。"
+description_en: "Local skill, already installed. When the user names scaffold-dev-agent or init-workflow, read this file and the sibling init-workflow.md. Do not search the skill marketplace or find-skills. Ask for MySQL or accept 无库. Ask for an existing git remote URL or accept 无远程."
 ---
 
 # Scaffold Development Agent
@@ -101,11 +102,20 @@ Before merging line by line, classify each MERGE:
 **Follow [init-workflow.md](init-workflow.md).** Summary:
 
 1. `./scripts/scan-project.ps1 -OutFile docs/_scan-raw.md`
-2. **向用户索要 MySQL 连接命令或 DSN**（必问）→ 有库则 `apply-mysql-dsn` 写 `.env` → 填复盘文档 → `SELECT 1`；**用户回「无库」则复盘标跳过，不写假 .env，不阻塞后续学习**
-3. Deep-read FE（+BE if any）→ `docs/项目结构与架构.md` + `AGENTS.md` + SSOT（无后端时写明待建）
-4. **填 adapter `project-progress` 快照**（禁止留下 `YYYY-MM-DD` / `<一句话>`）；写清「改代码必须写 SSOT」
-5. Point scripts `# ADAPT`（含 `kit-layout` 多 git / 代码扩展名；`.env` 路径，双 git 常为 backend；无库可暂不改 db 路径）
-6. 有库时：账号可全权限；写库须用户同意并用 `mysql.*`，且记入复盘日志
+2. **Git layout** — follow init-workflow Step A2 then A3. Read `- advice:` and either record it or ask once. Local `git init` only after the user picks a folder. Then ask once for an existing remote URL on each `repo_remotes` entry that is `none`, or accept「无远程」. `git-remote-add` proves the URL with `ls-remote`. Do not open a Gitee or GitHub repo. Do not commit, do not push, do not `git config`.
+3. **向用户索要 MySQL 连接命令或 DSN**（必问）→ 有库则 `apply-mysql-dsn` 写 `.env` → 填复盘文档 → `SELECT 1`；**用户回「无库」则复盘标跳过，不写假 .env，不阻塞后续学习**
+4. Deep-read FE（+BE if any）→ `docs/项目结构与架构.md` + `AGENTS.md` + SSOT（无后端时写明待建）
+5. **填 adapter `project-progress` 快照**（禁止留下 `YYYY-MM-DD` / `<一句话>`）；写清「改代码必须写 SSOT」
+6. Point scripts `# ADAPT`（含 `kit-layout` 多 git / 代码扩展名；`.env` 路径，双 git 常为 backend；无库可暂不改 db 路径）
+7. 有库时：账号可全权限；写库须用户同意并用 `mysql.*`，且记入复盘日志
+
+### Upgrade（项目里已有旧工具，本次能力当时还没有）
+
+升级不是重做初始化。顺序是：
+
+1. merge-safe 安装。`scripts/scan-project.ps1` 和 `.sh` 若与套件不同，会写成 `*.kit-new`。
+2. 旧项目的扫描脚本没有 `## Git layout`。这一段是套件行为，从 `*.kit-new` 合进项目里的脚本。项目改过的 `# ADAPT` 保留。合完删掉 `*.kit-new`。
+3. 用合完的 `scripts/scan-project` 再扫一次。`record_single` / `record_multi` 只核对，不改已有仓库。`ask_children` 列出还没有 `.git` 的项目目录并问一次。`ask_empty` 升级时不再问。`- repo_remotes:` 里仍然是 `none` 的仓库，按 Step A3 问一次已有地址，或接受「无远程」。已经有远程名的不动。不在网站上新建仓库，不提交，不推送。
 
 ### 5–6) Adapt + verify
 
