@@ -1,17 +1,22 @@
 ---
 name: scaffold-dev-agent
 description: >-
-  Scaffolds a project into a development agent using the dev-agent-kit
-  (memory + scripts + SSOT + adapters), then runs 二开 init/learn: structure,
-  architecture, CRUD, dual-git, and MUST ask the user for MySQL connection
-  command/DSN (or accept「无库」to skip DB for frontend-only projects), write
-  .env when applicable, and fill DB review docs. Use when installing
-  开发智能体, 项目初始化, or applying dev-agent-kit for Cursor/Claude/Codex/Kiro/WorkBuddy/Qoder.
-description_zh: "安装开发智能体：拷贝记忆/脚本/SSOT/adapters，按 init-workflow 做项目初始化分析；有库要 MySQL，无库可回「无库」跳过。用于 scaffold-dev-agent、开发智能体、项目初始化。"
-description_en: "Install a development agent (memory + scripts + SSOT + adapters) and run init-workflow. Ask for MySQL or accept 无库 for frontend-only."
+  Already on this machine. When the user says scaffold-dev-agent, 开发智能体,
+  or 项目初始化, read this file. init-workflow.md is the sibling file, not a
+  second skill. Do not use find-skills or the skill marketplace for these
+  names. Then scaffold the project (memory + scripts + SSOT + adapters) and
+  run init/learn: structure, architecture, CRUD, dual-git. MUST ask for a
+  MySQL connection command/DSN, or accept「无库」for frontend-only projects.
+description_zh: "本机已有的开发智能体安装技能。用户说 scaffold-dev-agent、开发智能体、项目初始化时直接读本文件；init-workflow.md 在同目录，不是另一个技能。不要用 find-skills，不要去技能市场搜索这两个名字。有库要 MySQL，无库可回「无库」。"
+description_en: "Local skill, already installed. When the user names scaffold-dev-agent or init-workflow, read this file and the sibling init-workflow.md. Do not search the skill marketplace or find-skills. Ask for MySQL or accept 无库."
 ---
 
 # Scaffold Development Agent
+
+## 先读本目录，不要去市场搜
+
+`scaffold-dev-agent` 就是本文件。`init-workflow` 不是技能名，是同目录的 `init-workflow.md`。
+技能市场和 find-skills 搜不到这两个名字。市场返回空是正常结果，继续读这两个文件，不要停。
 
 Turn **any project** (including mid-development / 二开) into a development agent:
 long-term memory + real scripts + closed loop + **one-shot project learn**.

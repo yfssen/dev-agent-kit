@@ -49,8 +49,14 @@ for dest in "${TARGETS[@]}"; do
 done
 
 echo ""
-echo "Done. On any project, open your AI tool and say:"
-echo "  use scaffold-dev-agent to install the development agent and run init-workflow"
+echo "Done."
+echo "Cursor / Claude / Codex / Kiro / Qoder, say:"
+echo "  use scaffold-dev-agent and read init-workflow.md"
+echo ""
+echo "WorkBuddy: do not say only the skill name. It searches the marketplace and reports not found."
+echo "Send the WorkBuddy sentence in the tools guide, section 2A. The file is:"
+echo "  $UP/.workbuddy/skills/scaffold-dev-agent/SKILL.md"
+echo "init-workflow.md is the sibling file, not a second skill."
 echo ""
 echo "kit-path.txt points to this KIT. Re-run ./install-global.sh after editing the skill."
 exit 0
