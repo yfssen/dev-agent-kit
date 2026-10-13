@@ -134,10 +134,20 @@ Before merging line by line, classify each MERGE:
 ## Closed loop
 
 ```
-locate (SSOT + rg + scan hot files) → read hits only → db → code → run verify (definition of done)
+read progress inventory → open only those hits → code → run verify → quote Done: yes
 ```
 
-Do not dump `_scan-raw.md` or whole trees into the reply. Claim done only when `verify` prints `Result: PASS`. Default `api-check` already truncates mismatch lists (`-All` / `ALL=1` for full).
+**Read.** On a new session, read `docs/项目进度与完成度.md` section 二 and the last 10 rows of section 六. Then open only the code those rows point at. Do not read every doc. Do not delete older section 六 rows.
+
+**Size.** If the request already says what to change and where, do it. If it is several independent pieces, finish one through `Done: yes` before starting the next. If the change grows, stop and say so.
+
+**Behavior vs internals.** Update `docs/项目结构与架构.md` in the same turn only when observable behavior changes (API, table meaning, route, permission, git layout). Read that matching section in full before editing it. A refactor, tooling edit, or docs-only edit gets a section 六 row and does not rewrite the architecture doc.
+
+**Bug.** Read the error, reproduce it once, then edit. The first `[FAIL]` line is the only next edit. Re-run the same `verify`.
+
+**Done.** Claim done only by quoting `== Done: yes ==` from a `verify` run in this same turn (`Result: PASS` and `WARN=0`). Exit code 1 happens only on `FAIL`. A `WARN` still exits 0 and prints `Done: no`. The latest section 六 row must contain each changed code path (`admin/x.php`, not only a summary). `verify` lists any path the row omits. Add that row and re-run. In that same reply, name any changed file the task did not ask for. The next session opens the paths in that row.
+
+Do not dump `_scan-raw.md` or whole trees into the reply. Default `api-check` already truncates mismatch lists (`-All` / `ALL=1` for full).
 
 ## Non-goals
 

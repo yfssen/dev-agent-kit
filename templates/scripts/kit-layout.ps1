@@ -130,3 +130,50 @@ function Test-KitSsotFresh([string]$ws, $codeRels) {
     }
     return ($maxSsot -ge $maxCode.AddSeconds(-2))
 }
+
+# Section heading bytes stay ASCII in this file. The chars are the progress-log title.
+function Get-KitProgressHeading {
+    return '## ' + [char]0x516D + [char]0x3001 + [char]0x53D8 + [char]0x66F4 + [char]0x8BB0 + [char]0x5F55
+}
+
+function Get-KitProgressDocs([string]$ws) {
+    $name = (-join @(
+        [char]0x9879, [char]0x76EE, [char]0x8FDB, [char]0x5EA6,
+        [char]0x4E0E, [char]0x5B8C, [char]0x6210, [char]0x5EA6
+    )) + '.md'
+    $prefer = Join-Path (Join-Path $ws 'docs') $name
+    if (Test-Path -LiteralPath $prefer) { return @($prefer) }
+    $dir = Join-Path $ws 'docs'
+    if (-not (Test-Path $dir)) { return @() }
+    return @(Get-ChildItem $dir -Filter *.md -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+}
+
+function Get-KitLatestProgressRow([string]$ws) {
+    $heading = Get-KitProgressHeading
+    $best = ''
+    foreach ($path in (Get-KitProgressDocs $ws)) {
+        $text = [IO.File]::ReadAllText($path)
+        $row = ''
+        $in = $false
+        foreach ($line in ($text -split '\r?\n')) {
+            if ($line.StartsWith($heading)) { $in = $true; continue }
+            if ($in -and $line.StartsWith('## ')) { $in = $false; continue }
+            if ($in -and $line.StartsWith('|') -and ($line.IndexOf('---') -lt 0)) { $row = $line }
+        }
+        if ($row) { $best = $row }
+    }
+    return $best
+}
+
+# Changed code paths the latest progress row does not mention.
+function Get-KitUnnamedChanges([string]$ws, $codeRels) {
+    $row = ((Get-KitLatestProgressRow $ws) -replace '\\', '/').ToLowerInvariant()
+    $missing = New-Object System.Collections.Generic.List[string]
+    foreach ($rel in @($codeRels)) {
+        if ($null -eq $rel) { continue }
+        $n = ([string]$rel -replace '\\', '/').Trim()
+        if (-not $n) { continue }
+        if (-not $row.Contains($n.ToLowerInvariant())) { [void]$missing.Add($n) }
+    }
+    return $missing
+}

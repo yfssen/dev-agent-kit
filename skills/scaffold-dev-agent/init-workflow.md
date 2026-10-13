@@ -169,11 +169,11 @@ Learn progress:
 - [ ] project-progress snapshot filled (no YYYY-MM-DD leftover)
 - [ ] kit-layout ADAPT'd (child .git + code exts) OR confirmed single-repo PHP default is correct
 - [ ] Backend / frontend stack + CRUD conventions (or 后端待建)
-- [ ] 二开约束 + UTF-8 / no BOM / no emoji in comments
+- [ ] 二开约束 + UTF-8 / no BOM / no emoji in comments / 直写少包一层
 - [ ] api-check once if feasible (else N/A)
 ```
 
-Daily after init: locate via SSOT / `rg` / scan Git hot files; read only the hits; prove with `scripts/verify` (`Result: PASS`). Do not paste whole `docs/_scan-raw.md`.
+Daily after init: read `docs/项目进度与完成度.md` section 二 and the last 10 rows of section 六, then only the code they point at. Do not read every doc. Do not delete older section 六 rows. If the request already says what and where, do it. Several independent pieces: each must reach `Done: yes` before the next starts. Update `docs/项目结构与架构.md` in the same turn only when observable behavior changes (API, table meaning, route, permission, git layout); read that section in full first. Refactors and docs-only edits do not rewrite it. For a bug, read the error and reproduce once before editing. The first `[FAIL]` is the only next edit. Claim done only by quoting `== Done: yes ==` from a `verify` run in this same turn. On `WARN` with no `FAIL`, append one section 六 row that lists each changed code path, then re-run. The next session opens those paths. Name any changed file the task did not ask for. Do not paste whole `docs/_scan-raw.md`.
 
 ## Step D — Tool-layer self-check（装完必查，别信「已安装」）
 

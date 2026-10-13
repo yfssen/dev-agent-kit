@@ -16,4 +16,4 @@ Codex 原生读取项目根目录 **`AGENTS.md`**，因此：
 定位（SSOT / rg / scan hot files）→ 只读命中文件 → db → 写码 → 收尾跑 verify（唯一完成闸）
 ```
 
-不要把 `docs/_scan-raw.md` 整份贴进对话。`api-check` 默认摘要，全量加 `-All` / `ALL=1`。声称做完前必跑 `./scripts/verify`。
+不要把 `docs/_scan-raw.md` 整份贴进对话。`api-check` 默认摘要，全量加 `-All` / `ALL=1`。声称做完前必跑 `./scripts/verify`，并引用本轮 `Done: yes`。新会话只读进度第二节和第六节最近 10 行。只有对外行为变了才改架构文档。修 bug 先复现一次。多改的文件要在回复里点名。

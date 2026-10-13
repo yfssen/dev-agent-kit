@@ -21,7 +21,7 @@
 - **fail-open**：钩子脚本自己出错时默认放行，不会因为钩子挂了导致整个 shell 用不了。
 - **响亮地失败对齐**：`lint` 退出码 `2`（检查器缺失，如没装 php）会被**跳过**，不冒充成代码错误；只有退出码 `1`（真语法错）才回灌。
 - **不要用 `stop` + `followup_message` 催 SSOT**。Cursor 会把它当成用户发出的下一条消息：出现在输入框里，并再跑一轮 Agent。多仓脏树会列出 `.phpstorm.meta.php`、`public/upgrade/sql/*.sql` 和「+210 more」，体验很差。脚本仍留在 `hooks/` 里，但是空操作（读完 stdin 就退出），防止旧 `hooks.json` 还在调用时继续发消息。新模板的 `hooks.json` 已去掉 `stop`。
-- **完成闸是 `verify`，不是钩子**：钩子是过程中的护栏；声称任务做完前必须跑 `scripts/verify`（lint + api-check + SSOT + 可选 smoke），`Result: PASS` 才算过。SSOT 是否过期只在 verify 里 WARN，不进聊天。
+- **完成闸是 `verify`，不是钩子**：钩子是过程中的护栏；声称任务做完前必须跑 `scripts/verify`（lint + api-check + SSOT + 可选 smoke），`Done: yes` 才算过。SSOT 过期是 `WARN`，退出码仍为 0，但 `Done: no`，不进聊天。
 
 ---
 

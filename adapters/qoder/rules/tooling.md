@@ -20,7 +20,7 @@ trigger: always_on
 - 自检：`./scripts/lint.ps1` 或 `./scripts/lint.sh`（缺依赖 exit 2，非假阳性语法错）
 - 冒烟：`./scripts/smoke.ps1` 或 `./scripts/smoke.sh`
 - 对账：`./scripts/api-check.ps1` 或 `./scripts/api-check.sh`
-- **验收闸**：`./scripts/verify.ps1` 或 `./scripts/verify.sh`（声称做完前必跑；只有 FAIL 未过闸）
+- **验收闸**：`./scripts/verify.ps1` 或 `./scripts/verify.sh`（引用本轮 `Done: yes` 才算做完；WARN 也是 Done: no）。新会话只读进度第二节和第六节最近 10 行。只有对外行为变了才改架构文档。修 bug 先复现一次。多改的文件要在回复里点名。
 
 ## 闭环
 

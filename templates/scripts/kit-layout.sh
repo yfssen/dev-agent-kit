@@ -131,3 +131,57 @@ kit_ssot_fresh() {
   [ "$ssot_any" = "0" ] && return 1
   [ "$max_ssot" -ge $((max_code - 2)) ]
 }
+
+# Heading bytes stay ASCII here. They are the progress-log title.
+kit_progress_heading() {
+  printf '## \345\205\255\343\200\201\345\217\230\346\233\264\350\256\260\345\275\225'
+}
+
+kit_progress_docs() {
+  ws="$1"
+  name=$(printf '\351\241\271\347\233\256\350\277\233\345\272\246\344\270\216\345\256\214\346\210\220\345\272\246.md')
+  prefer="$ws/docs/$name"
+  if [ -f "$prefer" ]; then
+    printf '%s\n' "$prefer"
+    return
+  fi
+  for f in "$ws"/docs/*.md; do
+    [ -f "$f" ] || continue
+    printf '%s\n' "$f"
+  done
+}
+
+kit_latest_progress_row() {
+  ws="$1"
+  heading=$(kit_progress_heading)
+  best=""
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    [ -f "$path" ] || continue
+    row=$(awk -v h="$heading" '
+      index($0, h) == 1 { insec = 1; next }
+      insec && index($0, "## ") == 1 { insec = 0 }
+      insec && index($0, "|") == 1 && index($0, "---") == 0 { row = $0 }
+      END { if (row != "") print row }
+    ' "$path")
+    [ -n "$row" ] && best="$row"
+  done <<EOF
+$(kit_progress_docs "$ws")
+EOF
+  printf '%s' "$best"
+}
+
+# Print changed paths the latest progress row does not mention.
+kit_unnamed_changes() {
+  ws="$1"
+  shift
+  row=$(kit_latest_progress_row "$ws" | tr '\\' '/' | tr '[:upper:]' '[:lower:]')
+  for rel in "$@"; do
+    [ -n "$rel" ] || continue
+    n=$(printf '%s' "$rel" | tr '\\' '/' | tr '[:upper:]' '[:lower:]')
+    case "$row" in
+      *"$n"*) ;;
+      *) printf '%s\n' "$rel" ;;
+    esac
+  done
+}

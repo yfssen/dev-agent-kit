@@ -2,6 +2,7 @@
 # + SSOT freshness (+ optional smoke), then a single PASS/FAIL -- the "definition
 # of done" the agent must pass before claiming a task is finished.
 # Each sub-check is PASS / FAIL / SKIP / WARN. Only FAIL fails the gate (exit 1).
+# Done: yes only when Result is PASS and WARN=0. A WARN still exits 0 and prints Done: no.
 # Missing script / missing checker / unconfigured paths -> SKIP (not FAIL), so an
 # unconfigured project still runs cleanly. Encoding: ASCII-only (no BOM).
 # ADAPT: $exts, $BaseUrl, and $ProbePath (must match smoke.ps1's first public endpoint).
@@ -102,9 +103,23 @@ if (-not (Test-Path $apiScript)) {
 if ($inGit) {
     $codeRels = @($changed)
     if ($codeRels.Count -eq 0) { Res 'SKIP' 'ssot' 'no code change in any git repo' }
-    elseif (Test-KitSsotFresh $root $codeRels) { Res 'PASS' 'ssot' 'workspace-root docs/*.md looks updated' }
-    elseif ($SsotStrict) { Res 'FAIL' 'ssot' 'code changed but workspace-root docs/*.md (SSOT) not updated' }
-    else { Res 'WARN' 'ssot' 'code changed but workspace-root docs/*.md (SSOT) not updated' }
+    else {
+        $missing = @()
+        if (Get-Command Get-KitUnnamedChanges -ErrorAction SilentlyContinue) {
+            $missing = @(Get-KitUnnamedChanges $root $codeRels)
+        }
+        $fresh = Test-KitSsotFresh $root $codeRels
+        $named = ($missing.Count -eq 0)
+        if ($fresh -and $named) {
+            Res 'PASS' 'ssot' 'latest progress row names the changed files'
+        } else {
+            $detail = 'code changed but workspace-root docs/*.md (SSOT) not updated'
+            if ($missing.Count -gt 0) {
+                $detail = 'latest progress row must name: ' + ($missing -join ', ')
+            }
+            if ($SsotStrict) { Res 'FAIL' 'ssot' $detail } else { Res 'WARN' 'ssot' $detail }
+        }
+    }
 } else {
     Res 'SKIP' 'ssot' 'no git repo at workspace root or immediate children'
 }
@@ -159,5 +174,15 @@ Write-Output "== verify =="
 foreach ($ln in $script:lines) { Write-Output $ln }
 $verdict = if ($script:failN -gt 0) { 'FAIL' } else { 'PASS' }
 Write-Output "== Result: $verdict (PASS=$($script:passN) FAIL=$($script:failN) WARN=$($script:warnN) SKIP=$($script:skipN)) =="
-if ($script:failN -gt 0) { exit 1 }
+if ($script:failN -gt 0) {
+    Write-Output "== Done: no =="
+    Write-Output "Next: fix the first [FAIL] line, then run this command again."
+    exit 1
+}
+if ($script:warnN -gt 0) {
+    Write-Output "== Done: no =="
+    Write-Output "Next: append one progress row naming the changed files, then run this command again."
+    exit 0
+}
+Write-Output "== Done: yes =="
 exit 0

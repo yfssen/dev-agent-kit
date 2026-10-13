@@ -221,6 +221,10 @@ if [ "$merged" -gt 0 ]; then
   echo "MERGE GUIDE: Git layout in scripts/scan-project.ps1 and .sh is new kit behavior. Old projects lack ## Git layout and repo_remotes. Take that section from *.kit-new, then run the merged scan. Record repos that already exist. Ask once only for project dirs that still have no .git. For each repo_remotes value none, ask once for an existing git URL or skip, and add it only with scripts/git-remote-add. Do not open a Gitee or GitHub repo. Do not commit. Do not push. Do not git config. Do not redo init."
   echo "MERGE GUIDE: single-repo git status, .php-only, and 1200s cooldown are old kit defaults, not project facts. Replace them."
   echo "MERGE GUIDE: ssot-reminder must not print followup_message. Drop the stop hook. Verify owns the SSOT WARN."
+  echo "MERGE GUIDE: verify prints Done: yes only when Result is PASS and WARN=0. Exit 1 only on FAIL. The first FAIL line is the next edit. A WARN means append one progress row (what changed, which check) and re-run. Take this from verify *.kit-new."
+  echo "MERGE GUIDE: daily work reads progress section 2 and the last 10 rows of section 6, then only the code they point at. Keep older rows. Update the architecture doc only when observable behavior changes. Reproduce a bug once before editing. Quote Done: yes from this turn. Name changed files the task did not ask for."
+  echo "MERGE GUIDE: coding rules say write it straight. No new interface, base class, factory, or generic layer for a single call. Backend follows the existing controller and service style. Take this from coding *.kit-new."
+  echo "MERGE GUIDE: the latest progress row must name each changed code path. verify WARNs with the missing paths. Take Get-KitUnnamedChanges from kit-layout *.kit-new."
   echo "MERGE GUIDE: leaving *.kit-new unmerged means this upgrade did not land."
   exit 2
 fi

@@ -3,6 +3,7 @@
 # (static) + SSOT freshness (+ optional smoke), then a single PASS/FAIL -- the
 # "definition of done" the agent must pass before claiming a task is finished.
 # Each sub-check is PASS / FAIL / SKIP / WARN. Only FAIL fails the gate (exit 1).
+# Done: yes only when Result is PASS and WARN=0. A WARN still exits 0 and prints Done: no.
 # Missing script / missing checker / unconfigured paths -> SKIP (not FAIL).
 # Encoding: ASCII-only (no BOM).
 # ADAPT: the code-extension test, BASE_URL, and PROBE_PATH (must match smoke.sh).
@@ -121,12 +122,22 @@ if [ "$in_git" = "1" ]; then
     done <<EOF
 $changed
 EOF
-    if kit_ssot_fresh "$ROOT" "$@"; then
-      res PASS ssot "workspace-root docs/*.md looks updated"
-    elif [ "$SSOT_STRICT" = "1" ]; then
-      res FAIL ssot "code changed but workspace-root docs/*.md (SSOT) not updated"
+    missing=""
+    if command -v kit_unnamed_changes >/dev/null 2>&1; then
+      missing=$(kit_unnamed_changes "$ROOT" "$@")
+    fi
+    if kit_ssot_fresh "$ROOT" "$@" && [ -z "$missing" ]; then
+      res PASS ssot "latest progress row names the changed files"
     else
-      res WARN ssot "code changed but workspace-root docs/*.md (SSOT) not updated"
+      detail="code changed but workspace-root docs/*.md (SSOT) not updated"
+      if [ -n "$missing" ]; then
+        detail="latest progress row must name: $(printf '%s' "$missing" | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
+      fi
+      if [ "$SSOT_STRICT" = "1" ]; then
+        res FAIL ssot "$detail"
+      else
+        res WARN ssot "$detail"
+      fi
     fi
   fi
 else
@@ -177,5 +188,15 @@ echo "== verify =="
 printf '%s\n' "$lines" | sed '/^$/d'
 if [ "$failN" -gt 0 ]; then verdict="FAIL"; else verdict="PASS"; fi
 echo "== Result: $verdict (PASS=$passN FAIL=$failN WARN=$warnN SKIP=$skipN) =="
-[ "$failN" -gt 0 ] && exit 1
+if [ "$failN" -gt 0 ]; then
+  echo "== Done: no =="
+  echo "Next: fix the first [FAIL] line, then run this command again."
+  exit 1
+fi
+if [ "$warnN" -gt 0 ]; then
+  echo "== Done: no =="
+  echo "Next: append one progress row naming the changed files, then run this command again."
+  exit 0
+fi
+echo "== Done: yes =="
 exit 0

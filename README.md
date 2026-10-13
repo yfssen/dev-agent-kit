@@ -128,7 +128,8 @@ chmod +x install-global.sh && ./install-global.sh
 ## 5. 目录
 
 > 想直接动手？看 **`操作文档.md`**。  
-> 各 AI 怎么触发？看 **`各工具使用指南.md`**。
+> 各 AI 怎么触发？看 **`各工具使用指南.md`**。  
+> 和公开套件怎么比？看 **`竞品对比.md`**。
 
 ```
 dev-agent-kit/
@@ -136,6 +137,7 @@ dev-agent-kit/
   README.md                          # 本文件：方法论 + 步骤 + 验收
   操作文档.md                        # 落地 SOP（照着敲）
   各工具使用指南.md                  # Cursor/Kiro/WorkBuddy/Qoder/Codex 怎么用
+  竞品对比.md                        # 和公开套件比什么、这次吸了什么
   skills/
     scaffold-dev-agent/              # 全局 Skill：安装 + 二开初始化学习
       SKILL.md

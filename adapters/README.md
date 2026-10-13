@@ -21,7 +21,7 @@
 | `workbuddy/` | `CODEBUDDY.md` + `.codebuddy/rules/` + 项目级 `.codebuddy/skills/scaffold-dev-agent/` | WorkBuddy/CodeBuddy（别名 `codebuddy`） |
 | `qoder/` | `.qoder/rules/*.md` | Qoder（另原生读 `AGENTS.md`） |
 | `hooks`（可选） | `.cursor/hooks.json` + `.cursor/hooks/*` | Cursor 钩子护栏（见 `templates/hooks/README.md`） |
-| `_common/` | 不直接拷贝 | 共享母本（含 `CODING.md`：无 BOM、注释无表情） |
+| `_common/` | 不直接拷贝 | 共享母本（含 `CODING.md`：无 BOM、注释无表情、直写少包一层） |
 
 > `hooks` 不是「某家 AI」而是**确定性护栏层**（事件触发自动执行），目前覆盖 Cursor；它把「别乱 push / 别直连写库 / 改完要自检 / 压缩前备份 SSOT」从「靠自觉」升级成「系统强制」。按需加 `hooks` token 安装。
 

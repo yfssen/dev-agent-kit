@@ -154,6 +154,7 @@ try {
     if ($vText -match '\[FAIL\] api-check') { Ok "verify flags fixture api-check FAIL" } else { Bad "verify should FAIL api-check on fixture" }
     if ($vText -match '\[SKIP\] smoke') { Ok "verify skips smoke when server down" } else { Bad "verify should SKIP smoke without server" }
     if ($vText -match '== Result: FAIL') { Ok "verify Result FAIL when a check FAILs" } else { Bad "verify should print Result FAIL" }
+    if ($vText -match '== Done: no ==') { Ok "verify Done no when a check FAILs" } else { Bad "verify should print Done no on FAIL" }
 
     # Fixture copy is not a repo. git rev-parse exits 128; the scan must not leak it.
     # backend/ + frontend/ have no .git, so advice is ask_children.
@@ -229,6 +230,7 @@ try {
       $v2 = $verify2 -join "`n"
       if ($v2 -match '\[PASS\] lint -- 1 changed') { Ok "verify lints dirty php" } else { Bad "verify should PASS lint on 1 dirty php" }
       if ($v2 -match '\[WARN\] ssot') { Ok "verify WARNs stale SSOT" } else { Bad "verify should WARN when code changed but SSOT not updated" }
+      if ($v2 -match '== Done: no ==') { Ok "verify WARN is not Done yes" } else { Bad "stale SSOT should print Done no" }
     } else {
       Write-Host "[WARN] git not available; verify lint/ssot git cases skipped" -ForegroundColor Yellow
     }
@@ -298,10 +300,37 @@ try {
           $mgVerify | ForEach-Object { Write-Host $_ }
           $mgV = $mgVerify -join "`n"
           if ($mgV -match '\[WARN\] ssot') { Ok "verify WARNs stale SSOT on multi-git" } else { Bad "verify should WARN ssot when child code dirty and root docs not updated" }
+          if ($mgV -match '== Done: no ==') { Ok "multi-git stale SSOT is Done no" } else { Bad "multi-git stale SSOT should print Done no" }
         } finally { Pop-Location }
 
         (Get-Item (Join-Path $mg "docs\progress.md")).LastWriteTimeUtc = [datetime]::UtcNow
         if (Test-KitSsotFresh $mg $mgCode) { Ok "root docs mtime SSOT fresh" } else { Bad "SSOT should be fresh after touching workspace-root docs/*.md" }
+
+        Push-Location $mg
+        try {
+          $omit = @(& .\scripts\verify.ps1 2>&1 | ForEach-Object { "$_" })
+        } finally { Pop-Location }
+        $omitText = $omit -join "`n"
+        if ($omitText -match '\[WARN\] ssot' -and $omitText -match 'admin/.+\.php' -and $omitText -match 'pc_web/.+\.vue') {
+          Ok "fresh docs still WARN when the latest row omits changed files"
+        } else {
+          Bad "verify should list changed paths missing from the progress row"
+        }
+        $heading = Get-KitProgressHeading
+        $rowLine = '| 2026-10-13 | ' + ($mgCode -join ', ') + ' | verify |'
+        $body = $heading + "`n| a | b |`n| --- | --- |`n" + $rowLine + "`n"
+        $utf8 = New-Object System.Text.UTF8Encoding $false
+        [IO.File]::WriteAllText((Join-Path $mg "docs\progress.md"), $body, $utf8)
+        Push-Location $mg
+        try {
+          $namedRun = @(& .\scripts\verify.ps1 2>&1 | ForEach-Object { "$_" })
+        } finally { Pop-Location }
+        $namedText = $namedRun -join "`n"
+        if ($namedText -match '\[PASS\] ssot' -and $namedText -match '== Done: yes ==') {
+          Ok "progress row that names changed files is Done yes"
+        } else {
+          Bad "naming changed files in the latest row should pass ssot and Done yes"
+        }
 
         # Remaining edits are older than SSOT. A deleted path must still count
         # (parent dir mtime), otherwise delete-only trees look fresh.
@@ -485,6 +514,7 @@ exit 3
         $vShOut | ForEach-Object { Write-Host $_ }
         $vShText = $vShOut -join "`n"
         if ($vShText -match '== Result:') { Ok "verify.sh prints Result line" } else { Bad "verify.sh should print == Result:" }
+        if ($vShText -match '== Done: no ==') { Ok "verify.sh prints Done no when a check fails" } else { Bad "verify.sh should print Done no" }
         if ($vShText -match '\[SKIP\] smoke') { Ok "verify.sh skips smoke on dead port" } else { Bad "verify.sh should SKIP smoke when probe cannot connect" }
       } else {
         Bad "scripts/verify.sh missing in workdir"
