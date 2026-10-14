@@ -4,12 +4,13 @@ description: >-
   Already on this machine. When the user says scaffold-dev-agent, 开发智能体,
   or 项目初始化, read this file. init-workflow.md is the sibling file, not a
   second skill. Do not use find-skills or the skill marketplace for these
-  names. Then scaffold the project (memory + scripts + SSOT + adapters) and
-  run init/learn: structure, architecture, CRUD, dual-git. MUST ask for a
-  MySQL connection command/DSN, or accept「无库」for frontend-only projects.
-  Ask for an existing git remote URL per repo, or accept「无远程」.
-description_zh: "本机已有的开发智能体安装技能。用户说 scaffold-dev-agent、开发智能体、项目初始化时直接读本文件；init-workflow.md 在同目录，不是另一个技能。不要用 find-skills，不要去技能市场搜索这两个名字。有库要 MySQL，无库可回「无库」。已有 git 地址问一次，可回「无远程」。"
-description_en: "Local skill, already installed. When the user names scaffold-dev-agent or init-workflow, read this file and the sibling init-workflow.md. Do not search the skill marketplace or find-skills. Ask for MySQL or accept 无库. Ask for an existing git remote URL or accept 无远程."
+  names. Detect kit state at the workspace root and do only the first match:
+  full init, takeover merge, upgrade, or daily work. Full init only when
+  scripts/verify.ps1 is absent and project rules do not already hold this
+  practice. On init or takeover, ask for MySQL or accept「无库」. Ask for an
+  existing git remote URL or accept「无远程」. Do not redo init on upgrade.
+description_zh: "本机已有的开发智能体安装技能。用户说 scaffold-dev-agent、开发智能体、项目初始化时直接读本文件；init-workflow.md 在同目录，不是另一个技能。不要用 find-skills，不要去技能市场。先看工作区根装到哪一步，只做对上的一件：完整初始化、接管合并、升级、或日常干活。没有 scripts/verify.ps1 且规则里也没有这套做法，才做完整初始化。升级不要重做初始化。有库要 MySQL，无库可回「无库」。已有 git 地址问一次，可回「无远程」。"
+description_en: "Local skill, already installed. When the user names scaffold-dev-agent or init-workflow, read this file and the sibling init-workflow.md. Do not search the skill marketplace or find-skills. Detect kit state and do only one branch: full init, takeover, upgrade, or daily work. Full init only when verify.ps1 is absent and the project has no existing practice. Ask for MySQL or accept 无库. Ask for an existing git remote URL or accept 无远程."
 ---
 
 # Scaffold Development Agent
@@ -47,14 +48,25 @@ For **in-progress projects**, existing files win on project facts. Kit content i
 3. Do not invent business rules; prefer code evidence.
 4. When writing code: encoding **UTF-8** (not GBK), **without BOM**; comments/docstrings **no emoji**.
 
+## 先判断装到哪一步（只做一件）
+
+目标是工作区根。双 git 用能同时看到前后端的父目录。只有 `AGENTS.md` 不算装过。停在第一行，不要接着做后面的行。不要 `-Force`，除非用户明确要求覆盖。
+
+1. 没有 `scripts/verify.ps1`，规则和文档里也没有这套进度、架构、写法 → 下面的 merge-safe 安装 + **完整** init/learn。
+2. 没有 `scripts/verify.ps1`，但规则或文档里已经有进度、架构、写法 → merge-safe 安装后**接管**。同名文件先读两边再合并：`AGENTS.md`，`docs/项目进度与完成度.md`、`docs/项目结构与架构.md`、`docs/数据库连接与复盘.md`，`.cursor/rules` 的 `tooling.mdc`、`coding.mdc`、`project-progress.mdc`，以及 `CLAUDE.md`、`CODEBUDDY.md`、`.kiro/steering/`、`.qoder/rules/`。已写的事实留下，verify、进度行、多仓扫描补进去。别的文件名里和套件重复的句子收掉。不要重做架构学习。库还没记过就问一次 MySQL，或接受「无库」。
+3. 有 `scripts/verify.ps1`，但 `scripts/kit-layout.ps1` 没有 `Get-KitUnnamedChanges`，或 `scripts/verify.ps1` 没有 `Done: yes`（只有 `.sh` 时看 `kit_unnamed_changes` 和 `verify.sh` 的 `Done: yes`）→ 只做下面的 **Upgrade**。不要重做初始化。留下的 `*.kit-new` 也走这一支，合完再停。
+4. 两处字样都在 → **Closed loop**。不要重装，不要重做初始化。
+
 ## Workflow
+
+分支 1 才走完下面 1–6。分支 2 做到第 3 步后按接管规则停。分支 3 只做 Upgrade。分支 4 跳到 Closed loop。
 
 ```
 Progress:
 - [ ] 1. Detect OS + AI tools + layout (single vs dual-git)
 - [ ] 2. Merge-safe install (core + adapters)
 - [ ] 3. Resolve MERGE (read → merge → delete *.kit-new)
-- [ ] 4. Project init/learn (REQUIRED unless user skips) — see init-workflow.md
+- [ ] 4. Project init/learn — branch 1 only — see init-workflow.md
 - [ ] 5. Fill project-progress snapshot (no YYYY-MM-DD leftover) + ADAPT kit-layout / lint / smoke / api-check
 - [ ] 6. Verify tools (db/mysql/lint/smoke/api-check/verify as available)
 ```
@@ -97,9 +109,9 @@ Before merging line by line, classify each MERGE:
 - Both sides have unique content -> line-by-line merge. **Project facts** = `# ADAPT` values (BaseUrl, ProbePath, `.env` path, checker command, filled progress). **Kit behavior** = multi-git scan (`kit-layout`), root-docs SSOT, code extensions, cooldown. Old single-repo `git status`, `.php`-only, and 1200s cooldown are previous kit defaults, not project facts — replace them with the `*.kit-new` behavior.
 - Leaving any `*.kit-new` in place means the upgrade did not land. The installer's `MERGE GUIDE` lines say the same thing; follow them.
 
-### 4) Project init/learn（一口气做完）
+### 4) Project init/learn（只有分支 1）
 
-**Follow [init-workflow.md](init-workflow.md).** Summary:
+**Branch 1 only. Follow [init-workflow.md](init-workflow.md).** Upgrade and daily work do not enter here. Summary:
 
 1. `./scripts/scan-project.ps1 -OutFile docs/_scan-raw.md`
 2. **Git layout** — follow init-workflow Step A2 then A3. Read `- advice:` and either record it or ask once. Local `git init` only after the user picks a folder. Then ask once for an existing remote URL on each `repo_remotes` entry that is `none`, or accept「无远程」. `git-remote-add` proves the URL with `ls-remote`. Do not open a Gitee or GitHub repo. Do not commit, do not push, do not `git config`.
