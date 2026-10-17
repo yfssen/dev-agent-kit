@@ -183,6 +183,33 @@ else
   fi
 fi
 
+# --- 5) repeat detection: the SAME check(s) failing N runs in a row ---
+# Fingerprint = failing check NAMES only (lint / api-check / smoke / ssot). It deliberately
+# excludes file counts, paths and hashes: those change between two runs of the same bug, so a
+# hash-based fingerprint would reset every time and never trip. The counter resets only when the
+# set of failing check names changes. The same names three times still warn. State file is gitignored. WARN only -- never
+# changes the exit code; the brake is advice, not a verdict.
+fail_names="$(printf '%s\n' "$lines" | sed -n 's/^\[FAIL\] \([^ ]*\).*/\1/p' | sort -u)"
+fp_file="$ROOT/.verify-fingerprint"
+prev_fp=""; prev_n=0
+if [ -f "$fp_file" ]; then
+  read -r prev_fp prev_n < "$fp_file" 2>/dev/null || true
+  case "$prev_n" in ''|*[!0-9]*) prev_n=0 ;; esac
+fi
+
+if [ -z "$fail_names" ]; then
+  rm -f "$fp_file"
+else
+  fp="$(printf '%s' "$fail_names" | tr '\n' '+' | sed 's/+$//')"
+  if [ "$fp" = "$prev_fp" ]; then run_n=$((prev_n + 1)); else run_n=1; fi
+  printf '%s %s' "$fp" "$run_n" > "$fp_file"
+  if [ "$run_n" -ge 3 ]; then
+    # Expose the streak so the closing "Next:" line can stop contradicting the brake.
+    repeat_run_n="$run_n"
+    res WARN repeat "same check(s) failing $run_n runs in a row ($fp); stop and re-diagnose before another attempt"
+  fi
+fi
+
 # --- Verdict ---
 echo "== verify =="
 printf '%s\n' "$lines" | sed '/^$/d'
@@ -190,7 +217,13 @@ if [ "$failN" -gt 0 ]; then verdict="FAIL"; else verdict="PASS"; fi
 echo "== Result: $verdict (PASS=$passN FAIL=$failN WARN=$warnN SKIP=$skipN) =="
 if [ "$failN" -gt 0 ]; then
   echo "== Done: no =="
-  echo "Next: fix the first [FAIL] line, then run this command again."
+  # When the brake is on, "fix the first FAIL and re-run" would contradict it -- the model
+  # follows the last line, so the brake would be cancelled out. Say the opposite instead.
+  if [ "${repeat_run_n:-0}" -ge 3 ]; then
+    echo "Next: STOP. The same check(s) failed $repeat_run_n runs in a row; re-diagnose before editing again (reproduce it, then read the evidence). Do not simply re-run this command."
+  else
+    echo "Next: fix the first [FAIL] line, then run this command again."
+  fi
   exit 1
 fi
 if [ "$warnN" -gt 0 ]; then

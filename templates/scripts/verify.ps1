@@ -169,6 +169,40 @@ if (-not (Test-Path $smokeScript)) {
     }
 }
 
+# --- 5) repeat detection: the SAME check(s) failing N runs in a row ---
+# Fingerprint = failing check NAMES only (lint / api-check / smoke / ssot). It deliberately
+# excludes file counts, paths and hashes: those change between two runs of the same bug, so a
+# hash-based fingerprint would reset every time and never trip. The counter resets only when the
+# set of failing check names changes. The same names three times still warn. State file is gitignored. WARN only -- never
+# changes the exit code; the brake is advice, not a verdict.
+$failNames = @($script:lines |
+    Where-Object { $_ -like '[[]FAIL]*' } |
+    ForEach-Object { ($_ -replace '^\[FAIL\]\s+', '') -replace '\s+--.*$', '' } |
+    Sort-Object -Unique)
+
+$fpFile = Join-Path $root '.verify-fingerprint'
+$prevFp = ''; $prevN = 0
+if (Test-Path -LiteralPath $fpFile) {
+    $raw = (Get-Content -LiteralPath $fpFile -Raw -ErrorAction SilentlyContinue)
+    if ($raw) {
+        $parts = @($raw.Trim() -split '\s+')
+        if ($parts.Count -ge 2) { $prevFp = $parts[0]; $prevN = [int]$parts[1] }
+    }
+}
+
+if ($failNames.Count -eq 0) {
+    if (Test-Path -LiteralPath $fpFile) { Remove-Item -LiteralPath $fpFile -Force -ErrorAction SilentlyContinue }
+} else {
+    $fp = ($failNames -join '+')
+    $runN = if ($fp -eq $prevFp) { $prevN + 1 } else { 1 }
+    try { [IO.File]::WriteAllText($fpFile, "$fp $runN") } catch { }
+    if ($runN -ge 3) {
+        # Expose the streak so the closing "Next:" line can stop contradicting the brake.
+        $script:repeatRunN = $runN
+        Res 'WARN' 'repeat' "same check(s) failing $runN runs in a row ($fp); stop and re-diagnose before another attempt"
+    }
+}
+
 # --- Verdict (Write-Output so agents/dry-run can capture; Write-Host is invisible to 2>&1 on PS 5.1) ---
 Write-Output "== verify =="
 foreach ($ln in $script:lines) { Write-Output $ln }
@@ -176,7 +210,13 @@ $verdict = if ($script:failN -gt 0) { 'FAIL' } else { 'PASS' }
 Write-Output "== Result: $verdict (PASS=$($script:passN) FAIL=$($script:failN) WARN=$($script:warnN) SKIP=$($script:skipN)) =="
 if ($script:failN -gt 0) {
     Write-Output "== Done: no =="
-    Write-Output "Next: fix the first [FAIL] line, then run this command again."
+    # When the brake is on, "fix the first FAIL and re-run" would contradict it -- the model
+    # follows the last line, so the brake would be cancelled out. Say the opposite instead.
+    if ($script:repeatRunN -ge 3) {
+        Write-Output "Next: STOP. The same check(s) failed $($script:repeatRunN) runs in a row; re-diagnose before editing again (reproduce it, then read the evidence). Do not simply re-run this command."
+    } else {
+        Write-Output "Next: fix the first [FAIL] line, then run this command again."
+    }
     exit 1
 }
 if ($script:warnN -gt 0) {

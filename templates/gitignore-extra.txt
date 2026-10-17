@@ -1,0 +1,12 @@
+# Rules this toolkit needs in a PROJECT's .gitignore.
+# Merged in by the installer (append-only, idempotent). Lines starting with # are ignored.
+# Nothing here is project-specific -- these are files the kit itself creates on this machine.
+
+# verify's repeat-detection state (machine-local; safe to delete any time)
+.verify-fingerprint
+
+# scan-project raw dump (regenerated on every scan)
+docs/_scan-raw.md
+
+# installer merge intermediates (left behind when an upgrade needs a manual merge)
+*.kit-new

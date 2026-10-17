@@ -90,6 +90,37 @@ if [ -d "$KIT/templates/scripts" ]; then
   chmod +x "$PROJ/scripts/"*.sh 2>/dev/null || true
 fi
 
+# --- Merge kit-required ignore rules into the PROJECT's .gitignore (append-only, idempotent) ---
+# verify writes .verify-fingerprint into the project root. The kit's own .gitignore does not
+# reach into projects, so without this the file shows up as untracked in every project that
+# installs the kit. Rules live in templates/gitignore-extra.txt and travel with the install.
+ignore_extra="$KIT/templates/gitignore-extra.txt"
+if [ -f "$ignore_extra" ]; then
+  gi="$PROJ/.gitignore"
+  # NOTE: do not reuse the global "added" counter here -- it counts NEW/FORCE files and is
+  # printed in the final summary. Resetting it to 0 silently undercounts the summary.
+  gi_added=0
+  while IFS= read -r rule; do
+    case "$rule" in ''|'#'*) continue ;; esac
+    if [ -f "$gi" ] && grep -qxF -- "$rule" "$gi" 2>/dev/null; then continue; fi
+    if [ "$gi_added" -eq 0 ]; then
+      # Start on a fresh line: a hand-edited .gitignore often has no trailing newline,
+      # and appending straight onto the last rule would corrupt it.
+      if [ -s "$gi" ] && [ -n "$(tail -c 1 "$gi" 2>/dev/null)" ]; then
+        printf '\n' >> "$gi"
+      fi
+      printf '\n# dev-agent-kit: files this toolkit creates on this machine\n' >> "$gi"
+    fi
+    printf '%s\n' "$rule" >> "$gi"
+    gi_added=$((gi_added + 1))
+  done < "$ignore_extra"
+  if [ "$gi_added" -gt 0 ]; then
+    echo "[GITIGNORE] added $gi_added rule(s) to .gitignore"
+  else
+    echo "[GITIGNORE] project .gitignore already covers the kit's rules"
+  fi
+fi
+
 # Opt-in capability layers (not AI-tool choices). "auto" reports missing ones only.
 CAP_LAYERS="hooks"
 
@@ -221,7 +252,7 @@ if [ "$merged" -gt 0 ]; then
   echo "MERGE GUIDE: Git layout in scripts/scan-project.ps1 and .sh is new kit behavior. Old projects lack ## Git layout and repo_remotes. Take that section from *.kit-new, then run the merged scan. Record repos that already exist. Ask once only for project dirs that still have no .git. For each repo_remotes value none, ask once for an existing git URL or skip, and add it only with scripts/git-remote-add. Do not open a Gitee or GitHub repo. Do not commit. Do not push. Do not git config. Do not redo init."
   echo "MERGE GUIDE: single-repo git status, .php-only, and 1200s cooldown are old kit defaults, not project facts. Replace them."
   echo "MERGE GUIDE: ssot-reminder must not print followup_message. Drop the stop hook. Verify owns the SSOT WARN."
-  echo "MERGE GUIDE: verify prints Done: yes only when Result is PASS and WARN=0. Exit 1 only on FAIL. The first FAIL line is the next edit. A WARN means append one progress row (what changed, which check) and re-run. Take this from verify *.kit-new."
+  echo "MERGE GUIDE: verify prints Done: yes only when Result is PASS and WARN=0. Exit 1 only on FAIL. The first FAIL line is the next edit. Next: STOP means the same checks failed three times: reproduce before another edit. A WARN means append one progress row (what changed, which check) and re-run. Take this from verify *.kit-new."
   echo "MERGE GUIDE: daily work reads progress section 2 and the last 10 rows of section 6, then only the code they point at. Keep older rows. Update the architecture doc only when observable behavior changes. Reproduce a bug once before editing. Quote Done: yes from this turn. Name changed files the task did not ask for."
   echo "MERGE GUIDE: coding rules say write it straight. No new interface, base class, factory, or generic layer for a single call. Backend follows the existing controller and service style. Take this from coding *.kit-new."
   echo "MERGE GUIDE: the latest progress row must name each changed code path. verify WARNs with the missing paths. Take Get-KitUnnamedChanges from kit-layout *.kit-new."

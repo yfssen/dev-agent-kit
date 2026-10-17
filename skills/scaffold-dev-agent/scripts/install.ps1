@@ -75,6 +75,50 @@ Get-ChildItem $scriptsSrc -File -ErrorAction SilentlyContinue | ForEach-Object {
     Install-File $_.FullName (Join-Path (Join-Path $ProjectRoot "scripts") $_.Name)
 }
 
+# --- Merge kit-required ignore rules into the PROJECT's .gitignore (append-only, idempotent) ---
+# verify writes .verify-fingerprint into the project root. The kit's own .gitignore does not
+# reach into projects, so without this the file shows up as untracked in every project that
+# installs the kit. Rules live in templates/gitignore-extra.txt and travel with the install.
+$ignoreExtra = Join-Path $KitRoot "templates\gitignore-extra.txt"
+if (Test-Path $ignoreExtra) {
+    # Explicit UTF8: the kit's rule file is ASCII, but PS 5.1 Get-Content defaults to the
+    # ANSI code page and would mis-decode anything non-ASCII it ever gains.
+    $rules = @(Get-Content -LiteralPath $ignoreExtra -Encoding UTF8 |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -and -not $_.StartsWith('#') })
+    if ($rules.Count -gt 0) {
+        $giPath = Join-Path $ProjectRoot ".gitignore"
+        $existing = @()
+        if (Test-Path $giPath) {
+            # Explicit UTF8 again: project .gitignore files commonly carry Chinese comments.
+            # Reading them as ANSI and writing back re-encodes every byte and corrupts them.
+            $existing = @(Get-Content -LiteralPath $giPath -Encoding UTF8)
+        }
+        $missing = @($rules | Where-Object { $existing -notcontains $_ })
+        if ($missing.Count -gt 0) {
+            # APPEND-ONLY. Never read-modify-write the whole file: that re-encodes existing
+            # content (PS 5.1 is not UTF-8 by default) and rewrites line endings. AppendAllText
+            # leaves every existing byte untouched, so the project keeps its own encoding.
+            $block = (@('# dev-agent-kit: files this toolkit creates on this machine') + $missing) -join "`n"
+            $prefix = ""
+            if (Test-Path $giPath) {
+                $raw = [IO.File]::ReadAllBytes($giPath)
+                if ($raw.Length -gt 0) {
+                    # A hand-edited .gitignore often has no trailing newline; without this the
+                    # first appended rule would glue onto the last existing line.
+                    $prefix = if ($raw[$raw.Length - 1] -eq 10) { "`n" } else { "`n`n" }
+                }
+            }
+            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+            [IO.File]::AppendAllText($giPath, $prefix + $block + "`n", $utf8NoBom)
+            Write-Host "[GITIGNORE] added $($missing.Count) rule(s): $($missing -join ', ')"
+        }
+        else {
+            Write-Host "[GITIGNORE] project .gitignore already covers the kit's rules"
+        }
+    }
+}
+
 $wanted = @($Adapters.Split(",") | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ })
 
 # Opt-in capability layers (not AI-tool choices). "auto" never force-adds these;
@@ -187,7 +231,7 @@ if ($mergeList.Count -gt 0) {
     Write-Host "MERGE GUIDE: Git layout in scripts/scan-project.ps1 and .sh is new kit behavior. Old projects lack ## Git layout and repo_remotes. Take that section from *.kit-new, then run the merged scan. Record repos that already exist. Ask once only for project dirs that still have no .git. For each repo_remotes value none, ask once for an existing git URL or skip, and add it only with scripts/git-remote-add. Do not open a Gitee or GitHub repo. Do not commit. Do not push. Do not git config. Do not redo init."
     Write-Host "MERGE GUIDE: single-repo git status, .php-only, and 1200s cooldown are old kit defaults, not project facts. Replace them."
     Write-Host "MERGE GUIDE: ssot-reminder must not print followup_message. Drop the stop hook. Verify owns the SSOT WARN."
-    Write-Host "MERGE GUIDE: verify prints Done: yes only when Result is PASS and WARN=0. Exit 1 only on FAIL. The first FAIL line is the next edit. A WARN means append one progress row (what changed, which check) and re-run. Take this from verify *.kit-new."
+    Write-Host "MERGE GUIDE: verify prints Done: yes only when Result is PASS and WARN=0. Exit 1 only on FAIL. The first FAIL line is the next edit. Next: STOP means the same checks failed three times: reproduce before another edit. A WARN means append one progress row (what changed, which check) and re-run. Take this from verify *.kit-new."
     Write-Host "MERGE GUIDE: daily work reads progress section 2 and the last 10 rows of section 6, then only the code they point at. Keep older rows. Update the architecture doc only when observable behavior changes. Reproduce a bug once before editing. Quote Done: yes from this turn. Name changed files the task did not ask for."
     Write-Host "MERGE GUIDE: coding rules say write it straight. No new interface, base class, factory, or generic layer for a single call. Backend follows the existing controller and service style. Take this from coding *.kit-new."
     Write-Host "MERGE GUIDE: the latest progress row must name each changed code path. verify WARNs with the missing paths. Take Get-KitUnnamedChanges from kit-layout *.kit-new."

@@ -76,7 +76,7 @@
 - SSOT = **工作区根**顶级 `docs/*.md`（不是子仓里的 docs）。判定：根 git 里这些文件脏了，**或**最新 SSOT 的 mtime ≥ 最新改动代码 mtime − 2s。
 - 代码改了但根 `docs/*.md` 没动 → 默认 WARN（`-SsotStrict` 才升为 FAIL）。
 - smoke 探测的是**本项目 API**（GET `$BaseUrl` + 与 smoke 相同的第一个公开端点，响应里要有 `"code"`）。端口上是别的站点（phpstudy 默认页等）→ SKIP，不把完成闸卡死。要强制跑：`-Full` / `--full`。
-- **声称任务做完之前必须引用本轮 `verify` 打出的 `Done: yes`**（`Result: PASS` 且 `WARN=0`）。只有 `FAIL` 让退出码为 1。有 `WARN` 时先补进度文档第六节一行，再跑同一条。第一条 `FAIL` 是下一次唯一要改的地方。
+- **声称任务做完之前必须引用本轮 `verify` 打出的 `Done: yes`**（`Result: PASS` 且 `WARN=0`）。只有 `FAIL` 让退出码为 1。有 `WARN` 时先补进度文档第六节一行，再跑同一条。第一条 `FAIL` 是下一次要改的地方。同一组检查连续失败三次时，按 `Next: STOP` 先复现，不要只改完再跑同一条。
 - 新会话只读进度文档第二节和第六节最近 10 行，再打开这些落点。旧行留着。只有对外行为变了才改架构文档对应小节。修 bug 先复现一次。任务没要求却改过的文件要在回复里点名。
 
 布局与扩展名在 `scripts/kit-layout.ps1` / `kit-layout.sh`（`$KitCodeExts` / `KIT_CODE_EXT` 默认 php/vue/js/ts/sql；可选 `$KitRepoNames` 限制子仓名单，空则自动发现一级子目录 `.git`）。

@@ -6,6 +6,9 @@
 docs/_scan-raw.md
 .workbuddy-ai/
 
+# Local gate state (machine-specific; regenerate freely)
+.verify-fingerprint
+
 # Editor / OS junk
 .DS_Store
 Thumbs.db

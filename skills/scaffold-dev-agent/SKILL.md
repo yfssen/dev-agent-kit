@@ -155,7 +155,7 @@ read progress inventory → open only those hits → code → run verify → quo
 
 **Behavior vs internals.** Update `docs/项目结构与架构.md` in the same turn only when observable behavior changes (API, table meaning, route, permission, git layout). Read that matching section in full before editing it. A refactor, tooling edit, or docs-only edit gets a section 六 row and does not rewrite the architecture doc.
 
-**Bug.** Read the error, reproduce it once, then edit. The first `[FAIL]` line is the only next edit. Re-run the same `verify`.
+**Bug.** Read the error, reproduce it once, then edit. The first `[FAIL]` line is the next edit. Re-run the same `verify`. If it prints `Next: STOP` (the same checks failed three times), reproduce and read the evidence before another edit.
 
 **Done.** Claim done only by quoting `== Done: yes ==` from a `verify` run in this same turn (`Result: PASS` and `WARN=0`). Exit code 1 happens only on `FAIL`. A `WARN` still exits 0 and prints `Done: no`. The latest section 六 row must contain each changed code path (`admin/x.php`, not only a summary). `verify` lists any path the row omits. Add that row and re-run. In that same reply, name any changed file the task did not ask for. The next session opens the paths in that row.
 

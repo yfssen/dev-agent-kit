@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 $KitRoot = Split-Path $PSScriptRoot -Parent
 $FixtureSrc = Join-Path $PSScriptRoot "fake-project"
 $failed = 0
+$bashEnvFile = $null
 $work = Join-Path $env:TEMP ("dev-agent-kit-dryrun-" + [guid]::NewGuid().ToString("n"))
 
 function Ok([string]$msg) { Write-Host "[PASS] $msg" -ForegroundColor Green }
@@ -377,6 +378,45 @@ try {
       }
     }
 
+    # --- repeat detection: same failing check N runs in a row (fingerprint = check names) ---
+    # Start from a clean state so earlier verify calls in this dry-run cannot leak in.
+    $fpFile = Join-Path $work '.verify-fingerprint'
+    if (Test-Path $fpFile) { Remove-Item $fpFile -Force }
+    $repeatSeen = $false
+    $fpCounts = @()
+    for ($i = 1; $i -le 3; $i++) {
+      $o = @(& .\scripts\verify.ps1 -Target backend\sample_ok.php -SsotStrict 2>&1 | ForEach-Object { "$_" })
+      if (Test-Path $fpFile) { $fpCounts += (Get-Content $fpFile -Raw).Trim() }
+      if (($o -join "`n") -match '\[WARN\] repeat') { $repeatSeen = $true }
+    }
+    # The fingerprint must be check NAMES only (no paths, no hashes) plus a run counter --
+    # a hash over paths/counts would reset on every run and never trip.
+    $fpOk = ($fpCounts.Count -eq 3) -and
+            ($fpCounts[0] -match '^[a-z][a-z-]*(\+[a-z][a-z-]*)* 1$') -and
+            ($fpCounts[2] -match '^[a-z][a-z-]*(\+[a-z][a-z-]*)* 3$')
+    if ($fpOk) { Ok "fingerprint is check names + run counter ($($fpCounts[2]))" } else { Bad "fingerprint should be names + counter, got '$($fpCounts -join ' | ')'" }
+    if ($repeatSeen) { Ok "verify brakes after 3 identical failures" } else { Bad "verify should WARN repeat after 3 identical failures" }
+    # The closing Next: line must not contradict the brake. The model follows the last line,
+    # so "fix the first FAIL and re-run" would silently cancel the brake it just set.
+    $nextLine = @(($o -join "`n") -split "`r?`n" | Where-Object { $_ -match '^Next:' } | Select-Object -Last 1)
+    if ($nextLine.Count -gt 0 -and $nextLine[0] -match 'STOP') {
+      Ok "verify Next: line stops instead of telling the model to re-run"
+    } else {
+      Bad "Next: should say STOP while the brake is on, got '$($nextLine -join '')'"
+    }
+
+    # The brake must lift on its own once nothing FAILs. Hide api-check (the fixture's only
+    # always-FAIL check) so this run is clean, then put it back.
+    $apiPath = Join-Path $work 'scripts\api-check.ps1'
+    $apiBak = "$apiPath.bak"
+    try {
+      Rename-Item $apiPath $apiBak
+      & .\scripts\verify.ps1 -Target backend\sample_ok.php 2>&1 | Out-Null
+    } finally {
+      if (Test-Path $apiBak) { Rename-Item $apiBak $apiPath }
+    }
+    if (-not (Test-Path $fpFile)) { Ok "verify clears the fingerprint when no check FAILs" } else { Bad "fingerprint should be removed when nothing FAILs" }
+
     # --- db security extras ---
     & .\scripts\db.ps1 "SELECT 1\gDROP TABLE users" 2>$null | Out-Null
     if ($LASTEXITCODE -eq 1) { Ok "db blocks mysql \\g delimiter (exit 1)" } else { Bad "db \\g expected exit 1, got $LASTEXITCODE" }
@@ -407,11 +447,67 @@ try {
       $installPsText = Get-Content $install -Raw
       if ($installPsText -match 'MERGE GUIDE') { Ok "install.ps1 source has MERGE GUIDE" } else { Bad "install.ps1 missing MERGE GUIDE" }
     }
+    # Seed a realistic project .gitignore BEFORE install: a non-ASCII comment (written from
+    # char codes so this file stays ASCII) and deliberately no trailing newline, which is what
+    # a hand-edited file often looks like. Both are traps for a read-modify-write installer.
+    $projGiSeed = Join-Path $work ".gitignore"
+    $cnComment = "# " + (-join ([char]0x6784, [char]0x5EFA, [char]0x4EA7, [char]0x7269))
+    [IO.File]::WriteAllText($projGiSeed, ($cnComment + "`nnode_modules/"), (New-Object System.Text.UTF8Encoding($false)))
+    $giSeedBytes = [IO.File]::ReadAllBytes($projGiSeed)
+
     & $install -KitRoot $KitRoot -ProjectRoot $work -Adapters "cursor,claude" 2>&1 | Out-Host
     if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {
       Ok "install.ps1 merge-safe exit=$LASTEXITCODE"
     } else {
       Bad "install.ps1 unexpected exit $LASTEXITCODE"
+    }
+
+    # --- kit ignore rules must land in the PROJECT's .gitignore, not only the kit's own ---
+    # verify writes .verify-fingerprint into the project root. Without this rule it becomes an
+    # untracked file in every installed project -- the kit's own .gitignore does not reach here.
+    $projGi = Join-Path $work ".gitignore"
+    $giLines = if (Test-Path $projGi) { @(Get-Content $projGi) } else { @() }
+    if ($giLines -contains '.verify-fingerprint') {
+      Ok "installer added .verify-fingerprint to the project .gitignore"
+    } else {
+      Bad "project .gitignore should list .verify-fingerprint after install"
+    }
+    # Idempotent: re-running install must not duplicate the rule.
+    $giBefore = @(Get-Content $projGi | Where-Object { $_ -eq '.verify-fingerprint' }).Count
+    & $install -KitRoot $KitRoot -ProjectRoot $work -Adapters "cursor,claude" 2>&1 | Out-Null
+    $giAfter = @(Get-Content $projGi | Where-Object { $_ -eq '.verify-fingerprint' }).Count
+    if ($giAfter -eq $giBefore -and $giAfter -ge 1) {
+      Ok "installer does not duplicate the ignore rule on re-run"
+    } else {
+      Bad "ignore rule duplicated on re-run ($giBefore -> $giAfter)"
+    }
+
+    # --- the installer must APPEND, never read-modify-write the project .gitignore ---
+    # Regression guard: the first implementation did Get-Content (ANSI on PS 5.1) + WriteAllText
+    # on the whole file. Every existing byte got re-encoded, so a Chinese comment in the
+    # project's .gitignore turned into mojibake the moment the kit was installed.
+    $giNowBytes = [IO.File]::ReadAllBytes($projGi)
+    $prefixIntact = $giNowBytes.Length -ge $giSeedBytes.Length
+    if ($prefixIntact) {
+      for ($i = 0; $i -lt $giSeedBytes.Length; $i++) {
+        if ($giNowBytes[$i] -ne $giSeedBytes[$i]) { $prefixIntact = $false; break }
+      }
+    }
+    if ($prefixIntact) {
+      Ok "installer left the pre-existing .gitignore bytes byte-for-byte untouched"
+    } else {
+      Bad "installer rewrote pre-existing .gitignore bytes (encoding corruption)"
+    }
+    $appended = [Text.Encoding]::UTF8.GetString($giNowBytes, $giSeedBytes.Length, $giNowBytes.Length - $giSeedBytes.Length)
+    if ($appended.StartsWith("`n")) {
+      Ok "installer starts the appended block on a fresh line (no glue onto last rule)"
+    } else {
+      Bad "appended ignore rules glued onto the last existing line (missing newline)"
+    }
+    if (([Text.Encoding]::UTF8.GetString($giNowBytes) -split "`n")[0] -eq $cnComment) {
+      Ok "non-ASCII .gitignore comment still decodes to the original text"
+    } else {
+      Bad "non-ASCII .gitignore comment was corrupted by the installer"
     }
 
     # --- bash .sh checks ---
@@ -439,6 +535,73 @@ try {
       }
     }
     if ($gitBash) {
+      # bash.exe started from PowerShell gets a rebuilt PATH that does NOT include Git's own
+      # /usr/bin, so every coreutils call inside the .sh scripts dies with exit 127
+      # ("mkdir: command not found", db.sh's cygpath guard). Prepending the Windows path from
+      # PowerShell does not help -- MSYS drops entries that point inside its own install root.
+      # BASH_ENV is sourced by every non-interactive bash, so the fix has to happen in-shell.
+      $bashEnvFile = Join-Path $env:TEMP ("kit-bash-env-" + [guid]::NewGuid().ToString("n") + ".sh")
+      [IO.File]::WriteAllText($bashEnvFile, "export PATH=/usr/bin:/bin:`$PATH`n", (New-Object System.Text.UTF8Encoding($false)))
+      $env:BASH_ENV = $bashEnvFile -replace '\\', '/'
+      $probe = @(& $gitBash -c 'command -v cygpath || echo MISSING' 2>&1 | ForEach-Object { "$_" })
+      if (($probe -join '') -match 'cygpath$') {
+        Ok "bash sees Git /usr/bin (BASH_ENV) -- .sh checks no longer report phantom exit 127"
+      } else {
+        Bad "bash still cannot find cygpath; .sh checks will report exit 127 ($($probe -join ' '))"
+      }
+
+      # --- install.sh: the NEW/FORCE summary must match the file lines it actually printed ---
+      # Regression guard: the ignore-rule block reused the global "added" counter and reset it
+      # to 0 mid-run, so the summary undercounted every core script installed before that point
+      # (28 files created, summary reported 7). A silent undercount hides install failures.
+      $shProj = Join-Path $env:TEMP ("kit-shinstall-" + [guid]::NewGuid().ToString("n"))
+      New-Item -ItemType Directory -Force $shProj | Out-Null
+      $shGi = Join-Path $shProj ".gitignore"
+      [IO.File]::WriteAllText($shGi, ($cnComment + "`nnode_modules/"), (New-Object System.Text.UTF8Encoding($false)))
+      $shSeedBytes = [IO.File]::ReadAllBytes($shGi)
+      $shScript = $installSh -replace '\\', '/'
+      $shKitArg = $KitRoot -replace '\\', '/'
+      $shProjArg = $shProj -replace '\\', '/'
+      $shOut = @(& $gitBash $shScript $shKitArg $shProjArg "cursor" 2>&1 | ForEach-Object { "$_" })
+      $shFileLines = @($shOut | Where-Object { $_ -match '^\[(NEW|FORCE)\]' }).Count
+      $shSummary = 0
+      foreach ($l in $shOut) {
+        $m = [regex]::Match($l, 'NEW/FORCE=(\d+)')
+        if ($m.Success) { $shSummary = [int]$m.Groups[1].Value; break }
+      }
+      if ($shSummary -eq $shFileLines -and $shFileLines -gt 0) {
+        Ok "install.sh summary NEW/FORCE=$shSummary matches the $shFileLines file(s) it reported"
+      } else {
+        Bad "install.sh summary NEW/FORCE=$shSummary but it printed $shFileLines [NEW]/[FORCE] line(s)"
+      }
+      $shBytes = [IO.File]::ReadAllBytes($shGi)
+      $shPrefixOk = $shBytes.Length -ge $shSeedBytes.Length
+      if ($shPrefixOk) {
+        for ($i = 0; $i -lt $shSeedBytes.Length; $i++) {
+          if ($shBytes[$i] -ne $shSeedBytes[$i]) { $shPrefixOk = $false; break }
+        }
+      }
+      if ($shPrefixOk) {
+        Ok "install.sh left the pre-existing .gitignore bytes untouched"
+      } else {
+        Bad "install.sh rewrote pre-existing .gitignore bytes"
+      }
+      $shText = [Text.Encoding]::UTF8.GetString($shBytes)
+      if (($shText -split "`n") -contains '.verify-fingerprint') {
+        Ok "install.sh added the kit rule to the project .gitignore"
+      } else {
+        Bad "install.sh did not add the kit rule to the project .gitignore"
+      }
+      & $gitBash $shScript $shKitArg $shProjArg "cursor" 2>&1 | Out-Null
+      $shText2 = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($shGi))
+      $shDup = @(($shText2 -split "`n") | Where-Object { $_ -eq '.verify-fingerprint' }).Count
+      if ($shDup -eq 1) {
+        Ok "install.sh does not duplicate the ignore rule on re-run"
+      } else {
+        Bad "install.sh duplicated the ignore rule on re-run (count=$shDup)"
+      }
+      Remove-Item $shProj -Recurse -Force -ErrorAction SilentlyContinue
+
       $dbSh = Join-Path (Get-Location) "scripts\db.sh"
       $lf = ([IO.File]::ReadAllText($dbSh) -replace "`r`n", "`n" -replace "`r", "`n")
       [IO.File]::WriteAllText($dbSh, $lf, (New-Object System.Text.UTF8Encoding $false))
@@ -569,6 +732,9 @@ exit 3
 finally {
   if (Test-Path $work) {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  if ($bashEnvFile -and (Test-Path $bashEnvFile)) {
+    Remove-Item $bashEnvFile -Force -ErrorAction SilentlyContinue
   }
 }
 
